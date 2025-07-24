@@ -62,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (treatment == "Prosthesis Fitted") {
       if (subtype == "Fixed Dentures") {
         return PFDInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
-
       } else if (subtype == "Removable Dentures") {
         return PRDInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
       }
