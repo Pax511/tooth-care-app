@@ -726,6 +726,7 @@ class HomeMainContent extends StatelessWidget {
         ),
     );
   }
+
   Widget _buildCalendarGrid(
       DateTime procedureDate, int dayOfRecovery, int recoveryDays) {
     DateTime now = DateTime.now();
