@@ -62,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (treatment == "Prosthesis Fitted") {
       if (subtype == "Fixed Dentures") {
         return PFDInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
-
       } else if (subtype == "Removable Dentures") {
         return PRDInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
       }
@@ -726,6 +725,7 @@ class HomeMainContent extends StatelessWidget {
         ),
     );
   }
+
   Widget _buildCalendarGrid(
       DateTime procedureDate, int dayOfRecovery, int recoveryDays) {
     DateTime now = DateTime.now();
