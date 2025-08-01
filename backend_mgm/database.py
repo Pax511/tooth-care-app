@@ -22,13 +22,15 @@ if not all(required_vars):
 DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # ✅ Create async SQLAlchemy engine
-engine = create_async_engine(DATABASE_URL, echo=True)
+engine = create_async_engine(DATABASE_URL, echo=True, future=True)
 
 # ✅ Configure async session factory
 AsyncSessionLocal = sessionmaker(
     bind=engine,
     class_=AsyncSession,
-    expire_on_commit=False
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False,
 )
 
 # ✅ Base class for SQLAlchemy models
@@ -37,4 +39,7 @@ Base = declarative_base()
 # ✅ Dependency for FastAPI routes to access DB session
 async def get_db():
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        finally:
+            await session.close()
