@@ -30,7 +30,7 @@ class Patient(Base):
     doctor_feedbacks = relationship("DoctorFeedback", back_populates="patient", cascade="all, delete-orphan")
     progress_entries = relationship("Progress", back_populates="patient", cascade="all, delete-orphan")
     instruction_statuses = relationship("InstructionStatus", back_populates="patient", cascade="all, delete-orphan")
-    treatment_infos = relationship("TreatmentInfo", back_populates="patient", cascade="all, delete-orphan")
+    # REMOVE treatment_infos, we don't want to use the separate treatment_info table for live onboarding/treatment storage
 
 # ✅ Doctor Table
 class Doctor(Base):
@@ -106,15 +106,6 @@ class InstructionStatus(Base):
 
     patient = relationship("Patient", back_populates="instruction_statuses")
 
-# ✅ TreatmentInfo Table (NEW)
-class TreatmentInfo(Base):
-    __tablename__ = "treatment_info"
-
-    id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-    treatment = Column(String, nullable=False)
-    subtype = Column(String, nullable=True)
-    procedure_date = Column(Date, nullable=False)
-    procedure_time = Column(Time, nullable=False)
-
-    patient = relationship("Patient", back_populates="treatment_infos")
+# Remove TreatmentInfo Table for main onboarding/treatment storage!
+# If you want to keep historical records, you can keep this table,
+# but for current onboarding/treatment info, use the Patient table only.
