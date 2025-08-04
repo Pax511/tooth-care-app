@@ -11,7 +11,7 @@ from schemas import (
     PatientPublic, FeedbackCreate, FeedbackResponse,
     ProgressCreate, ProgressEntry,
     InstructionStatusBulkCreate, InstructionStatusResponse,
-    TreatmentInfoCreate, TreatmentInfoResponse
+    TreatmentInfoCreate
 )
 from database import get_db, engine
 import os
@@ -267,9 +267,9 @@ async def save_department_doctor(
     return {"status": "success", "department": data.department, "doctor": data.doctor}
 
 # -------------------------------------------------
-# ✅ Treatment Info SAVE Endpoint (New)
+# ✅ Treatment Info SAVE Endpoint (Updates Patient Table Directly)
 # -------------------------------------------------
-@app.post("/treatment-info", response_model=TreatmentInfoResponse)
+@app.post("/treatment-info", response_model=PatientPublic)
 async def save_treatment_info(
     info: TreatmentInfoCreate,
     db: AsyncSession = Depends(get_db)
@@ -278,15 +278,15 @@ async def save_treatment_info(
     patient = result.scalar_one_or_none()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
-    db_row = models.TreatmentInfo(
-        patient_id=patient.id,
-        treatment=info.treatment,
-        subtype=info.subtype,
-        procedure_date=info.procedure_date,
-        procedure_time=info.procedure_time,
-        # TODO: Add procedure_completed here if needed in the model and schema!
-    )
-    db.add(db_row)
+
+    # Update treatment info directly in patients table
+    patient.treatment = info.treatment
+    patient.treatment_subtype = info.subtype
+    patient.procedure_date = info.procedure_date
+    patient.procedure_time = info.procedure_time
+    # patient.procedure_completed = info.procedure_completed  # If you want to support this, add to schema
+
+    db.add(patient)
     await db.commit()
-    await db.refresh(db_row)
-    return db_row
+    await db.refresh(patient)
+    return patient
