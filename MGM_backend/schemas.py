@@ -26,14 +26,14 @@ class PatientBase(BaseModel):
     email: EmailStr
     username: str
 
-    # Persistent onboarding/treatment fields
+    # Mirrors of current episode
     department: Optional[str] = None
     doctor: Optional[str] = None
     treatment: Optional[str] = None
     treatment_subtype: Optional[str] = None
     procedure_date: Optional[date] = None
     procedure_time: Optional[time] = None
-    procedure_completed: Optional[bool] = None   # <-- Added this line
+    procedure_completed: Optional[bool] = None
 
 class PatientCreate(PatientBase):
     password: str
@@ -43,14 +43,14 @@ class PatientUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
 
-    # Persistent onboarding/treatment fields
+    # Mirrors of current episode
     department: Optional[str] = None
     doctor: Optional[str] = None
     treatment: Optional[str] = None
     treatment_subtype: Optional[str] = None
     procedure_date: Optional[date] = None
     procedure_time: Optional[time] = None
-    procedure_completed: Optional[bool] = None   # <-- Added this line
+    procedure_completed: Optional[bool] = None
 
 class Patient(BaseModel):
     id: int
@@ -62,14 +62,14 @@ class Patient(BaseModel):
     username: str
     password: str  # For internal use only
 
-    # Persistent onboarding/treatment fields
+    # Mirrors of current episode
     department: Optional[str] = None
     doctor: Optional[str] = None
     treatment: Optional[str] = None
     treatment_subtype: Optional[str] = None
     procedure_date: Optional[date] = None
     procedure_time: Optional[time] = None
-    procedure_completed: Optional[bool] = None   # <-- Added this line
+    procedure_completed: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -82,14 +82,14 @@ class PatientPublic(BaseModel):
     email: EmailStr
     username: str
 
-    # Persistent onboarding/treatment fields
+    # Mirrors of current episode
     department: Optional[str] = None
     doctor: Optional[str] = None
     treatment: Optional[str] = None
     treatment_subtype: Optional[str] = None
     procedure_date: Optional[date] = None
     procedure_time: Optional[time] = None
-    procedure_completed: Optional[bool] = None   # <-- Added this line
+    procedure_completed: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -193,7 +193,7 @@ class InstructionStatusResponse(InstructionStatusItem):
     model_config = ConfigDict(from_attributes=True)
 
 # -------------------
-# ✅ Department/Doctor Selection Schemas (NEW)
+# ✅ Department/Doctor Selection
 # -------------------
 
 class DepartmentDoctorSelection(BaseModel):
@@ -201,7 +201,7 @@ class DepartmentDoctorSelection(BaseModel):
     doctor: str
 
 # -------------------
-# ✅ TreatmentInfo Schemas (NEW)
+# ✅ TreatmentInfo Schemas
 # -------------------
 
 class TreatmentInfoCreate(BaseModel):
@@ -220,3 +220,42 @@ class TreatmentInfoResponse(BaseModel):
     procedure_time: time
 
     model_config = ConfigDict(from_attributes=True)
+
+# -------------------
+# ✅ Episodes (NEW)
+# -------------------
+
+class EpisodeBase(BaseModel):
+    department: Optional[str] = None
+    doctor: Optional[str] = None
+    treatment: Optional[str] = None
+    subtype: Optional[str] = None
+    procedure_date: Optional[date] = None
+    procedure_time: Optional[time] = None
+
+class EpisodeResponse(EpisodeBase):
+    id: int
+    patient_id: int
+    procedure_completed: bool
+    locked: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+class CurrentEpisodeResponse(BaseModel):
+    id: int
+    patient_id: int
+    locked: bool
+    procedure_completed: bool
+    procedure_date: Optional[date] = None
+    procedure_time: Optional[time] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class MarkCompleteRequest(BaseModel):
+    procedure_completed: bool = True
+    procedure_date: Optional[date] = None
+    procedure_time: Optional[time] = None
+
+class RotateIfDueResponse(BaseModel):
+    rotated: bool
+    new_episode_id: Optional[int] = None

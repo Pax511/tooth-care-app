@@ -1,0 +1,17 @@
+from datetime import date, timedelta
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from .deps import get_db, get_current_user
+from .models import Patient  # or Episode, if you have a separate table
+
+router = APIRouter(prefix="/episodes", tags=["episodes"])
+
+@router.post("/rotate-if-due")
+def rotate_if_due(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    patient = db.query(Patient).filter(Patient.username == user.username).first()
+    if not patient or not patient.procedure_date:
+        return {"rotated": False, "reason": "No procedure date"}
+    if (date.today() - patient.procedure_date) < timedelta(days=15):
+        return {"rotated": False, "reason": "Not due yet"}
+    # Your actual rotation logic here (e.g., create new Episode row)
+    return {"rotated": True}
