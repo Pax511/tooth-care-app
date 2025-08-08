@@ -2,10 +2,6 @@ from pydantic import BaseModel, EmailStr, ConfigDict
 from datetime import datetime, date, time
 from typing import Optional, List
 
-# -------------------
-# ✅ Auth Schemas
-# -------------------
-
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -14,10 +10,6 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
-# -------------------
-# ✅ Patient Schemas
-# -------------------
-
 class PatientBase(BaseModel):
     name: str
     dob: date
@@ -25,8 +17,6 @@ class PatientBase(BaseModel):
     phone: str
     email: EmailStr
     username: str
-
-    # Mirrors of current episode
     department: Optional[str] = None
     doctor: Optional[str] = None
     treatment: Optional[str] = None
@@ -42,8 +32,6 @@ class PatientUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
-
-    # Mirrors of current episode
     department: Optional[str] = None
     doctor: Optional[str] = None
     treatment: Optional[str] = None
@@ -60,9 +48,7 @@ class Patient(BaseModel):
     phone: str
     email: EmailStr
     username: str
-    password: str  # For internal use only
-
-    # Mirrors of current episode
+    password: str
     department: Optional[str] = None
     doctor: Optional[str] = None
     treatment: Optional[str] = None
@@ -70,7 +56,6 @@ class Patient(BaseModel):
     procedure_date: Optional[date] = None
     procedure_time: Optional[time] = None
     procedure_completed: Optional[bool] = None
-
     model_config = ConfigDict(from_attributes=True)
 
 class PatientPublic(BaseModel):
@@ -81,8 +66,6 @@ class PatientPublic(BaseModel):
     phone: str
     email: EmailStr
     username: str
-
-    # Mirrors of current episode
     department: Optional[str] = None
     doctor: Optional[str] = None
     treatment: Optional[str] = None
@@ -90,12 +73,7 @@ class PatientPublic(BaseModel):
     procedure_date: Optional[date] = None
     procedure_time: Optional[time] = None
     procedure_completed: Optional[bool] = None
-
     model_config = ConfigDict(from_attributes=True)
-
-# -------------------
-# ✅ Doctor Schemas
-# -------------------
 
 class DoctorBase(BaseModel):
     name: str
@@ -109,12 +87,7 @@ class Doctor(DoctorBase):
     id: int
     username: str
     password: str
-
     model_config = ConfigDict(from_attributes=True)
-
-# -------------------
-# ✅ Appointment Schemas
-# -------------------
 
 class AppointmentBase(BaseModel):
     patient_id: int
@@ -126,12 +99,7 @@ class AppointmentCreate(AppointmentBase):
 
 class Appointment(AppointmentBase):
     id: int
-
     model_config = ConfigDict(from_attributes=True)
-
-# -------------------
-# ✅ Feedback Schema (Patient -> Hospital)
-# -------------------
 
 class FeedbackCreate(BaseModel):
     message: str
@@ -139,10 +107,6 @@ class FeedbackCreate(BaseModel):
 class FeedbackResponse(BaseModel):
     message: str
     status: str = "success"
-
-# -------------------
-# ✅ Doctor Feedback Schemas (Doctor -> Patient)
-# -------------------
 
 class DoctorFeedbackCreate(BaseModel):
     patient_id: int
@@ -153,12 +117,7 @@ class DoctorFeedback(BaseModel):
     doctor_id: int
     patient_id: int
     message: str
-
     model_config = ConfigDict(from_attributes=True)
-
-# -------------------
-# ✅ Progress Schemas
-# -------------------
 
 class ProgressCreate(BaseModel):
     message: str
@@ -167,18 +126,13 @@ class ProgressEntry(BaseModel):
     id: int
     message: str
     timestamp: datetime
-
     model_config = ConfigDict(from_attributes=True)
-
-# -------------------
-# ✅ Instruction Status Schemas
-# -------------------
 
 class InstructionStatusItem(BaseModel):
     date: date
     treatment: str
     subtype: Optional[str] = None
-    group: str        # "dos" or "donts"
+    group: str
     instruction_index: int
     instruction_text: str
     followed: bool
@@ -189,20 +143,11 @@ class InstructionStatusBulkCreate(BaseModel):
 class InstructionStatusResponse(InstructionStatusItem):
     id: int
     patient_id: int
-
     model_config = ConfigDict(from_attributes=True)
-
-# -------------------
-# ✅ Department/Doctor Selection
-# -------------------
 
 class DepartmentDoctorSelection(BaseModel):
     department: str
     doctor: str
-
-# -------------------
-# ✅ TreatmentInfo Schemas
-# -------------------
 
 class TreatmentInfoCreate(BaseModel):
     username: str
@@ -218,12 +163,7 @@ class TreatmentInfoResponse(BaseModel):
     subtype: Optional[str] = None
     procedure_date: date
     procedure_time: time
-
     model_config = ConfigDict(from_attributes=True)
-
-# -------------------
-# ✅ Episodes (NEW)
-# -------------------
 
 class EpisodeBase(BaseModel):
     department: Optional[str] = None
@@ -238,7 +178,6 @@ class EpisodeResponse(EpisodeBase):
     patient_id: int
     procedure_completed: bool
     locked: bool
-
     model_config = ConfigDict(from_attributes=True)
 
 class CurrentEpisodeResponse(BaseModel):
@@ -248,7 +187,6 @@ class CurrentEpisodeResponse(BaseModel):
     procedure_completed: bool
     procedure_date: Optional[date] = None
     procedure_time: Optional[time] = None
-
     model_config = ConfigDict(from_attributes=True)
 
 class MarkCompleteRequest(BaseModel):
