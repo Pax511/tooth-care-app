@@ -9,12 +9,12 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select  # SQLAlchemy 2.x
 
-# Package-qualified imports (work on Render)
-from MGM_backend import models, schemas
-from MGM_backend.database import get_db, engine
-from MGM_backend.schemas import (
+# Use relative imports inside the package
+from . import models, schemas
+from .database import get_db, engine
+from .schemas import (
     PatientPublic,
     FeedbackCreate,
     FeedbackResponse,
@@ -27,11 +27,11 @@ from MGM_backend.schemas import (
     CurrentEpisodeResponse,
     MarkCompleteRequest,
     RotateIfDueResponse,
+    DepartmentDoctorSelection,
 )
 
 app = FastAPI()
 
-# CORS for Flutter/Android
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,7 +42,6 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    # Create tables if they don't exist
     async with engine.begin() as conn:
         await conn.run_sync(models.Base.metadata.create_all)
 
@@ -60,17 +59,14 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
-):
-    credentials_exception = HTTPException(
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+    cred_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
@@ -79,21 +75,18 @@ async def get_current_user(
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
         if username is None:
-            raise credentials_exception
+            raise cred_exc
     except JWTError:
-        raise credentials_exception
+        raise cred_exc
 
     result = await db.execute(select(models.Patient).where(models.Patient.username == username))
     user = result.scalar_one_or_none()
     if user is None:
-        raise credentials_exception
+        raise cred_exc
     return user
 
-async def get_current_doctor(
-    token: str = Depends(doctor_oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
-):
-    credentials_exception = HTTPException(
+async def get_current_doctor(token: str = Depends(doctor_oauth2_scheme), db: AsyncSession = Depends(get_db)):
+    cred_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials (doctor)",
         headers={"WWW-Authenticate": "Bearer"},
@@ -102,28 +95,20 @@ async def get_current_doctor(
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
         if username is None:
-            raise credentials_exception
+            raise cred_exc
     except JWTError:
-        raise credentials_exception
+        raise cred_exc
 
     result = await db.execute(select(models.Doctor).where(models.Doctor.username == username))
     doctor = result.scalar_one_or_none()
     if doctor is None:
-        raise credentials_exception
+        raise cred_exc
     return doctor
-
-async def require_admin(user: models.Patient = Depends(get_current_user)):
-    if user.username != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
-    return user
 
 @app.get("/")
 async def root():
     return {"message": "✅ MGM Hospital API is running."}
 
-# -------------------
-# Episodes internals
-# -------------------
 async def _get_or_create_open_episode(db: AsyncSession, patient_id: int) -> models.TreatmentEpisode:
     stmt = (
         select(models.TreatmentEpisode)
@@ -138,7 +123,6 @@ async def _get_or_create_open_episode(db: AsyncSession, patient_id: int) -> mode
     if ep:
         return ep
 
-    # Create first/open episode
     new_ep = models.TreatmentEpisode(
         patient_id=patient_id,
         department=None,
@@ -168,28 +152,18 @@ async def _mirror_episode_to_patient(db: AsyncSession, patient: models.Patient, 
     await db.refresh(patient)
 
 async def _rotate_if_due(db: AsyncSession, patient: models.Patient) -> Optional[int]:
-    """
-    If the open episode is completed and 15+ days have passed since procedure_date,
-    lock it, create a new open episode, and mirror cleared values to patient.
-    Returns new episode id if rotated, else None.
-    """
     ep = await _get_or_create_open_episode(db, patient.id)
-
     if ep.locked:
         return None
     if not ep.procedure_completed or not ep.procedure_date:
         return None
-
-    days_elapsed = (date.today() - ep.procedure_date).days
-    if days_elapsed < 15:
+    if (date.today() - ep.procedure_date).days < 15:
         return None
 
-    # Lock current
     ep.locked = True
     db.add(ep)
     await db.commit()
 
-    # Create new open episode
     new_ep = models.TreatmentEpisode(
         patient_id=patient.id,
         department=None,
@@ -205,13 +179,9 @@ async def _rotate_if_due(db: AsyncSession, patient: models.Patient) -> Optional[
     await db.commit()
     await db.refresh(new_ep)
 
-    # Mirror cleared values
     await _mirror_episode_to_patient(db, patient, new_ep)
     return new_ep.id
 
-# -------------------
-# Auth
-# -------------------
 @app.post("/signup", response_model=schemas.TokenResponse)
 async def signup(patient: schemas.PatientCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.Patient).where(models.Patient.username == patient.username))
@@ -225,7 +195,6 @@ async def signup(patient: schemas.PatientCreate, db: AsyncSession = Depends(get_
     await db.commit()
     await db.refresh(db_patient)
 
-    # Create initial episode and mirror to patient
     ep = await _get_or_create_open_episode(db, db_patient.id)
     await _mirror_episode_to_patient(db, db_patient, ep)
 
@@ -233,120 +202,59 @@ async def signup(patient: schemas.PatientCreate, db: AsyncSession = Depends(get_
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/login", response_model=schemas.TokenResponse)
-async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        result = await db.execute(select(models.Patient).where(models.Patient.username == form_data.username))
-        user = result.scalar_one_or_none()
-        if not user or not verify_password(form_data.password, user.password):
-            raise HTTPException(status_code=401, detail="Incorrect username or password")
-
-        access_token = create_access_token(data={"sub": user.username})
-        return {"access_token": access_token, "token_type": "bearer"}
-    except Exception as e:
-        print("❌ Login error:", e)
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.Patient).where(models.Patient.username == form_data.username))
+    user = result.scalar_one_or_none()
+    if not user or not verify_password(form_data.password, user.password):
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/doctor-login", response_model=schemas.TokenResponse)
-async def doctor_login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_db),
-):
+async def doctor_login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.Doctor).where(models.Doctor.username == form_data.username))
     doctor = result.scalar_one_or_none()
     if not doctor or not verify_password(form_data.password, doctor.password):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     access_token = create_access_token(data={"sub": doctor.username})
-    return {"access_token": "bearer", "token_type": access_token}
+    return {"access_token": access_token, "token_type": "bearer"}
 
-# -------------------
-# Patient profile
-# -------------------
 @app.get("/patients/me", response_model=PatientPublic)
-async def get_my_profile(
-    current_user: models.Patient = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    # Ensure rotation if due so mirrored fields reflect the current episode
+async def get_my_profile(current_user: models.Patient = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await _rotate_if_due(db, current_user)
     return current_user
 
-# -------------------
-# Feedback
-# -------------------
 @app.post("/feedback", response_model=FeedbackResponse)
-async def submit_feedback(
-    feedback: FeedbackCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
-    new_feedback = models.Feedback(
-        patient_id=current_user.id,
-        message=feedback.message,
-    )
+async def submit_feedback(feedback: FeedbackCreate, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+    new_feedback = models.Feedback(patient_id=current_user.id, message=feedback.message)
     db.add(new_feedback)
     await db.commit()
     await db.refresh(new_feedback)
     return {"message": feedback.message, "status": "success"}
 
 @app.get("/feedback", response_model=List[FeedbackResponse])
-async def get_my_feedbacks(
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
-    result = await db.execute(
-        select(models.Feedback).where(models.Feedback.patient_id == current_user.id)
-    )
+async def get_my_feedbacks(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+    result = await db.execute(select(models.Feedback).where(models.Feedback.patient_id == current_user.id))
     feedbacks = result.scalars().all()
     return [{"message": f.message, "status": "success"} for f in feedbacks]
 
-# -------------------
-# Progress
-# -------------------
 @app.post("/progress", response_model=ProgressEntry)
-async def submit_progress(
-    progress: ProgressCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
-    # Rotate episode if due before recording new progress
+async def submit_progress(progress: ProgressCreate, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     await _rotate_if_due(db, current_user)
-
-    db_entry = models.Progress(
-        patient_id=current_user.id,
-        message=progress.message,
-    )
+    db_entry = models.Progress(patient_id=current_user.id, message=progress.message)
     db.add(db_entry)
     await db.commit()
     await db.refresh(db_entry)
     return db_entry
 
 @app.get("/progress", response_model=List[ProgressEntry])
-async def get_progress(
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
-    result = await db.execute(
-        select(models.Progress)
-        .where(models.Progress.patient_id == current_user.id)
-        .order_by(models.Progress.timestamp.desc())
-    )
+async def get_progress(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+    result = await db.execute(select(models.Progress).where(models.Progress.patient_id == current_user.id).order_by(models.Progress.timestamp.desc()))
     return result.scalars().all()
 
-# -------------------
-# Instruction Status
-# -------------------
 @app.post("/instruction-status", response_model=List[InstructionStatusResponse])
-async def save_instruction_status(
-    payload: InstructionStatusBulkCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
-    # Rotate episode if due before recording new instruction statuses
+async def save_instruction_status(payload: InstructionStatusBulkCreate, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     await _rotate_if_due(db, current_user)
-
     saved: list[models.InstructionStatus] = []
     for item in payload.items:
         row = models.InstructionStatus(
@@ -367,20 +275,12 @@ async def save_instruction_status(
     return saved
 
 @app.get("/instruction-status", response_model=List[InstructionStatusResponse])
-async def list_instruction_status(
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
-    q = select(models.InstructionStatus).where(
-        models.InstructionStatus.patient_id == current_user.id
-    )
+async def list_instruction_status(date_from: Optional[date] = None, date_to: Optional[date] = None, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+    q = select(models.InstructionStatus).where(models.InstructionStatus.patient_id == current_user.id)
     if date_from:
         q = q.where(models.InstructionStatus.date >= date_from)
     if date_to:
         q = q.where(models.InstructionStatus.date <= date_to)
-
     result = await db.execute(
         q.order_by(
             models.InstructionStatus.date.desc(),
@@ -390,63 +290,30 @@ async def list_instruction_status(
     )
     return result.scalars().all()
 
-# -------------------
-# Department / Doctor
-# -------------------
-class DepartmentDoctorUpdate(BaseModel):
-    department: str
-    doctor: str
-
 @app.post("/department-doctor")
-async def save_department_doctor(
-    data: DepartmentDoctorUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
-    # Rotate if due and get open episode
+async def save_department_doctor(data: DepartmentDoctorSelection, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     await _rotate_if_due(db, current_user)
     ep = await _get_or_create_open_episode(db, current_user.id)
-
-    # If somehow locked, block writes
     if ep.locked:
         raise HTTPException(status_code=423, detail="Episode is locked and cannot be modified.")
-
-    # Write to episode and mirror to patient
     ep.department = data.department
     ep.doctor = data.doctor
     db.add(ep)
     await db.commit()
     await db.refresh(ep)
-
     await _mirror_episode_to_patient(db, current_user, ep)
+    return {"status": "success", "department": data.department, "doctor": data.doctor, "current_episode_id": ep.id}
 
-    return {
-        "status": "success",
-        "department": data.department,
-        "doctor": data.doctor,
-        "current_episode_id": ep.id,
-    }
-
-# -------------------
-# Treatment Info
-# -------------------
 @app.post("/treatment-info", response_model=PatientPublic)
-async def save_treatment_info(
-    info: TreatmentInfoCreate,
-    db: AsyncSession = Depends(get_db),
-):
+async def save_treatment_info(info: TreatmentInfoCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.Patient).where(models.Patient.username == info.username))
     patient = result.scalar_one_or_none()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
-
-    # Rotate if due and get open episode
     await _rotate_if_due(db, patient)
     ep = await _get_or_create_open_episode(db, patient.id)
     if ep.locked:
         raise HTTPException(status_code=423, detail="Episode is locked and cannot be modified.")
-
-    # Update episode fields
     ep.treatment = info.treatment
     ep.subtype = info.subtype
     ep.procedure_date = info.procedure_date
@@ -454,43 +321,24 @@ async def save_treatment_info(
     db.add(ep)
     await db.commit()
     await db.refresh(ep)
-
-    # Mirror back to patient for backward compatibility with existing client views
     await _mirror_episode_to_patient(db, patient, ep)
     return patient
 
-# -------------------
-# Episodes APIs
-# -------------------
 @app.get("/episodes/current", response_model=CurrentEpisodeResponse)
-async def get_current_episode(
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
+async def get_current_episode(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     await _rotate_if_due(db, current_user)
     ep = await _get_or_create_open_episode(db, current_user.id)
     return CurrentEpisodeResponse.model_validate(ep, from_attributes=True)
 
 @app.get("/episodes/history", response_model=List[EpisodeResponse])
-async def get_episode_history(
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
-    stmt = (
-        select(models.TreatmentEpisode)
-        .where(models.TreatmentEpisode.patient_id == current_user.id)
-        .order_by(models.TreatmentEpisode.id.desc())
-    )
+async def get_episode_history(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+    stmt = select(models.TreatmentEpisode).where(models.TreatmentEpisode.patient_id == current_user.id).order_by(models.TreatmentEpisode.id.desc())
     res = await db.execute(stmt)
     episodes = res.scalars().all()
     return [EpisodeResponse.model_validate(e, from_attributes=True) for e in episodes]
 
 @app.post("/episodes/mark-complete", response_model=EpisodeResponse)
-async def mark_episode_complete(
-    payload: MarkCompleteRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
+async def mark_episode_complete(payload: MarkCompleteRequest, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     ep = await _get_or_create_open_episode(db, current_user.id)
     if ep.locked:
         raise HTTPException(status_code=423, detail="Episode is locked and cannot be modified.")
@@ -502,18 +350,12 @@ async def mark_episode_complete(
     db.add(ep)
     await db.commit()
     await db.refresh(ep)
-
-    # Mirror to patient
     await _mirror_episode_to_patient(db, current_user, ep)
-
     return EpisodeResponse.model_validate(ep, from_attributes=True)
 
-@app.post("/episodes/rotate-if-due", response_model=RotateIfDueResponse)
-async def rotate_if_due_endpoint(
-    db: AsyncSession = Depends(get_db),
-    current_user: models.Patient = Depends(get_current_user),
-):
+@app.post("/episodes/rotate-if-due", response_model=schemas.RotateIfDueResponse)
+async def rotate_if_due_endpoint(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     new_id = await _rotate_if_due(db, current_user)
     if new_id is None:
-        return RotateIfDueResponse(rotated=False, new_episode_id=None)
-    return RotateIfDueResponse(rotated=True, new_episode_id=new_id)
+        return schemas.RotateIfDueResponse(rotated=False, new_episode_id=None)
+    return schemas.RotateIfDueResponse(rotated=True, new_episode_id=new_id)
