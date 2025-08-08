@@ -16,21 +16,50 @@ class Patient(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
 
-    # Persistent onboarding/treatment fields
+    # Persistent onboarding/treatment fields (mirrors of current episode)
     department = Column(String, nullable=True)
     doctor = Column(String, nullable=True)
     treatment = Column(String, nullable=True)
     treatment_subtype = Column(String, nullable=True)
     procedure_date = Column(Date, nullable=True)
     procedure_time = Column(Time, nullable=True)
-    procedure_completed = Column(Boolean, nullable=True, default=None)  # <-- Added for new feature
+    procedure_completed = Column(Boolean, nullable=True, default=None)
 
+    # Relationships
     appointments = relationship("Appointment", back_populates="patient", cascade="all, delete-orphan")
     feedbacks = relationship("Feedback", back_populates="patient", cascade="all, delete-orphan")
     doctor_feedbacks = relationship("DoctorFeedback", back_populates="patient", cascade="all, delete-orphan")
     progress_entries = relationship("Progress", back_populates="patient", cascade="all, delete-orphan")
     instruction_statuses = relationship("InstructionStatus", back_populates="patient", cascade="all, delete-orphan")
-    # REMOVE treatment_infos, we don't want to use the separate treatment_info table for live onboarding/treatment storage
+
+    # New: episodes history (each care episode has its own ID)
+    episodes = relationship("TreatmentEpisode", back_populates="patient", cascade="all, delete-orphan")
+
+
+# ✅ TreatmentEpisode Table (NEW)
+class TreatmentEpisode(Base):
+    __tablename__ = "treatment_episodes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Episode-scoped fields
+    department = Column(String, nullable=True)
+    doctor = Column(String, nullable=True)
+    treatment = Column(String, nullable=True)
+    subtype = Column(String, nullable=True)
+
+    procedure_date = Column(Date, nullable=True)
+    procedure_time = Column(Time, nullable=True)
+
+    procedure_completed = Column(Boolean, default=False, nullable=False)
+    locked = Column(Boolean, default=False, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationship
+    patient = relationship("Patient", back_populates="episodes")
+
 
 # ✅ Doctor Table
 class Doctor(Base):
@@ -45,6 +74,7 @@ class Doctor(Base):
     appointments = relationship("Appointment", back_populates="doctor", cascade="all, delete-orphan")
     doctor_feedbacks = relationship("DoctorFeedback", back_populates="doctor", cascade="all, delete-orphan")
 
+
 # ✅ Appointment Table
 class Appointment(Base):
     __tablename__ = "appointments"
@@ -57,6 +87,7 @@ class Appointment(Base):
     patient = relationship("Patient", back_populates="appointments")
     doctor = relationship("Doctor", back_populates="appointments")
 
+
 # ✅ Feedback Table (Patient -> Hospital)
 class Feedback(Base):
     __tablename__ = "feedback"
@@ -66,6 +97,7 @@ class Feedback(Base):
     message = Column(String, nullable=False)
 
     patient = relationship("Patient", back_populates="feedbacks")
+
 
 # ✅ DoctorFeedback Table (Doctor -> Patient)
 class DoctorFeedback(Base):
@@ -79,6 +111,7 @@ class DoctorFeedback(Base):
     doctor = relationship("Doctor", back_populates="doctor_feedbacks")
     patient = relationship("Patient", back_populates="doctor_feedbacks")
 
+
 # ✅ Progress Table (Patient recovery feedback)
 class Progress(Base):
     __tablename__ = "progress"
@@ -90,7 +123,8 @@ class Progress(Base):
 
     patient = relationship("Patient", back_populates="progress_entries")
 
-# ✅ InstructionStatus Table (NEW)
+
+# ✅ InstructionStatus Table
 class InstructionStatus(Base):
     __tablename__ = "instruction_status"
 
@@ -105,7 +139,3 @@ class InstructionStatus(Base):
     followed = Column(Boolean, default=False)
 
     patient = relationship("Patient", back_populates="instruction_statuses")
-
-# Remove TreatmentInfo Table for main onboarding/treatment storage!
-# If you want to keep historical records, you can keep this table,
-# but for current onboarding/treatment info, use the Patient table only.
