@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, date
 import os
 from typing import List, Optional
+# Root shim so 'uvicorn main:app' works on Render
+from MGM_backend.main import app  # noqa: F401
 
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-# IMPORTANT: use package-qualified imports so this works on Render
+# Package-qualified imports (work on Render)
 from MGM_backend import models, schemas
 from MGM_backend.database import get_db, engine
 from MGM_backend.schemas import (
