@@ -1,1 +1,0 @@
-# Makes MGM_backend a Python package
