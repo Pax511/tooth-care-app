@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, date
 import os
 from typing import List, Optional
 
+from models import MyModel
+from database import get_db
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -13,7 +15,7 @@ from sqlalchemy import select  # SQLAlchemy 2.x
 
 # Use relative imports inside the package
 from . import models, schemas
-from .database import get_db, engine
+from .database import  engine
 from .schemas import (
     PatientPublic,
     FeedbackCreate,
