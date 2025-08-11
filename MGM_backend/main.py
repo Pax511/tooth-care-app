@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, date
 import os
 from typing import List, Optional
 
-from models import Patient, Doctor, Appointment, Feedback, DoctorFeedback, Progress, InstructionStatus, TreatmentEpisode
+import models
 from database import get_db
 
 from fastapi import FastAPI, Depends, HTTPException, status
@@ -15,7 +15,9 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select  # SQLAlchemy 2.x
 
-
+# You will need to import your schemas and engine as well:
+import schemas
+from database import engine
 
 app = FastAPI()
 
@@ -206,27 +208,27 @@ async def doctor_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Asy
     access_token = create_access_token(data={"sub": doctor.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/patients/me", response_model=PatientPublic)
+@app.get("/patients/me", response_model=schemas.PatientPublic)
 async def get_my_profile(current_user: models.Patient = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await _rotate_if_due(db, current_user)
     return current_user
 
-@app.post("/feedback", response_model=FeedbackResponse)
-async def submit_feedback(feedback: FeedbackCreate, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+@app.post("/feedback", response_model=schemas.FeedbackResponse)
+async def submit_feedback(feedback: schemas.FeedbackCreate, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     new_feedback = models.Feedback(patient_id=current_user.id, message=feedback.message)
     db.add(new_feedback)
     await db.commit()
     await db.refresh(new_feedback)
     return {"message": feedback.message, "status": "success"}
 
-@app.get("/feedback", response_model=List[FeedbackResponse])
+@app.get("/feedback", response_model=List[schemas.FeedbackResponse])
 async def get_my_feedbacks(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     result = await db.execute(select(models.Feedback).where(models.Feedback.patient_id == current_user.id))
     feedbacks = result.scalars().all()
     return [{"message": f.message, "status": "success"} for f in feedbacks]
 
-@app.post("/progress", response_model=ProgressEntry)
-async def submit_progress(progress: ProgressCreate, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+@app.post("/progress", response_model=schemas.ProgressEntry)
+async def submit_progress(progress: schemas.ProgressCreate, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     await _rotate_if_due(db, current_user)
     db_entry = models.Progress(patient_id=current_user.id, message=progress.message)
     db.add(db_entry)
@@ -234,13 +236,13 @@ async def submit_progress(progress: ProgressCreate, db: AsyncSession = Depends(g
     await db.refresh(db_entry)
     return db_entry
 
-@app.get("/progress", response_model=List[ProgressEntry])
+@app.get("/progress", response_model=List[schemas.ProgressEntry])
 async def get_progress(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     result = await db.execute(select(models.Progress).where(models.Progress.patient_id == current_user.id).order_by(models.Progress.timestamp.desc()))
     return result.scalars().all()
 
-@app.post("/instruction-status", response_model=List[InstructionStatusResponse])
-async def save_instruction_status(payload: InstructionStatusBulkCreate, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+@app.post("/instruction-status", response_model=List[schemas.InstructionStatusResponse])
+async def save_instruction_status(payload: schemas.InstructionStatusBulkCreate, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     await _rotate_if_due(db, current_user)
     saved: list[models.InstructionStatus] = []
     for item in payload.items:
@@ -261,7 +263,7 @@ async def save_instruction_status(payload: InstructionStatusBulkCreate, db: Asyn
         await db.refresh(r)
     return saved
 
-@app.get("/instruction-status", response_model=List[InstructionStatusResponse])
+@app.get("/instruction-status", response_model=List[schemas.InstructionStatusResponse])
 async def list_instruction_status(date_from: Optional[date] = None, date_to: Optional[date] = None, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     q = select(models.InstructionStatus).where(models.InstructionStatus.patient_id == current_user.id)
     if date_from:
@@ -278,7 +280,7 @@ async def list_instruction_status(date_from: Optional[date] = None, date_to: Opt
     return result.scalars().all()
 
 @app.post("/department-doctor")
-async def save_department_doctor(data: DepartmentDoctorSelection, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+async def save_department_doctor(data: schemas.DepartmentDoctorSelection, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     await _rotate_if_due(db, current_user)
     ep = await _get_or_create_open_episode(db, current_user.id)
     if ep.locked:
@@ -291,8 +293,8 @@ async def save_department_doctor(data: DepartmentDoctorSelection, db: AsyncSessi
     await _mirror_episode_to_patient(db, current_user, ep)
     return {"status": "success", "department": data.department, "doctor": data.doctor, "current_episode_id": ep.id}
 
-@app.post("/treatment-info", response_model=PatientPublic)
-async def save_treatment_info(info: TreatmentInfoCreate, db: AsyncSession = Depends(get_db)):
+@app.post("/treatment-info", response_model=schemas.PatientPublic)
+async def save_treatment_info(info: schemas.TreatmentInfoCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.Patient).where(models.Patient.username == info.username))
     patient = result.scalar_one_or_none()
     if not patient:
@@ -311,21 +313,21 @@ async def save_treatment_info(info: TreatmentInfoCreate, db: AsyncSession = Depe
     await _mirror_episode_to_patient(db, patient, ep)
     return patient
 
-@app.get("/episodes/current", response_model=CurrentEpisodeResponse)
+@app.get("/episodes/current", response_model=schemas.CurrentEpisodeResponse)
 async def get_current_episode(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     await _rotate_if_due(db, current_user)
     ep = await _get_or_create_open_episode(db, current_user.id)
-    return CurrentEpisodeResponse.model_validate(ep, from_attributes=True)
+    return schemas.CurrentEpisodeResponse.model_validate(ep, from_attributes=True)
 
-@app.get("/episodes/history", response_model=List[EpisodeResponse])
+@app.get("/episodes/history", response_model=List[schemas.EpisodeResponse])
 async def get_episode_history(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     stmt = select(models.TreatmentEpisode).where(models.TreatmentEpisode.patient_id == current_user.id).order_by(models.TreatmentEpisode.id.desc())
     res = await db.execute(stmt)
     episodes = res.scalars().all()
-    return [EpisodeResponse.model_validate(e, from_attributes=True) for e in episodes]
+    return [schemas.EpisodeResponse.model_validate(e, from_attributes=True) for e in episodes]
 
-@app.post("/episodes/mark-complete", response_model=EpisodeResponse)
-async def mark_episode_complete(payload: MarkCompleteRequest, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+@app.post("/episodes/mark-complete", response_model=schemas.EpisodeResponse)
+async def mark_episode_complete(payload: schemas.MarkCompleteRequest, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     ep = await _get_or_create_open_episode(db, current_user.id)
     if ep.locked:
         raise HTTPException(status_code=423, detail="Episode is locked and cannot be modified.")
@@ -338,7 +340,7 @@ async def mark_episode_complete(payload: MarkCompleteRequest, db: AsyncSession =
     await db.commit()
     await db.refresh(ep)
     await _mirror_episode_to_patient(db, current_user, ep)
-    return EpisodeResponse.model_validate(ep, from_attributes=True)
+    return schemas.EpisodeResponse.model_validate(ep, from_attributes=True)
 
 @app.post("/episodes/rotate-if-due", response_model=schemas.RotateIfDueResponse)
 async def rotate_if_due_endpoint(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
