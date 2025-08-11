@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, date
 import os
 from typing import List, Optional
 
-from models import MyModel
+from models import Patient, Doctor, Appointment, Feedback, DoctorFeedback, Progress, InstructionStatus, TreatmentEpisode
 from database import get_db
 
 from fastapi import FastAPI, Depends, HTTPException, status
