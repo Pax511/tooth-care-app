@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 
 # IMPORTANT: import Base from the package's database module
-from .database import Base
+from database import Base
 
 class Patient(Base):
     __tablename__ = "patients"
