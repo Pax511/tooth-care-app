@@ -104,11 +104,15 @@ class _ToothFractureOptions extends StatelessWidget {
 class ProsthesisTypeSelector extends StatefulWidget {
   final Function(String) onTypeSelected;
   final VoidCallback onBackToTreatment;
+  final Future<bool> Function(String, String) checkForOngoingTreatment;
+  final Function(String) showOngoingTreatmentSnackBar;
 
   const ProsthesisTypeSelector({
     Key? key,
     required this.onTypeSelected,
     required this.onBackToTreatment,
+    required this.checkForOngoingTreatment,
+    required this.showOngoingTreatmentSnackBar,
   }) : super(key: key);
 
   @override
@@ -176,6 +180,15 @@ class _ProsthesisTypeSelectorState extends State<ProsthesisTypeSelector> {
                   final selectedDateTime = await showDateTimePicker(context);
                   if (selectedDateTime != null) {
                     final appState = Provider.of<AppState>(context, listen: false);
+                    final username = appState.username ?? '';
+                    
+                    // Check for ongoing treatment before proceeding
+                    final hasOngoing = await widget.checkForOngoingTreatment('Prosthesis Fitted', username);
+                    if (hasOngoing) {
+                      widget.showOngoingTreatmentSnackBar('Prosthesis Fitted');
+                      return;
+                    }
+                    
                     appState.setTreatment('Prosthesis Fitted', subtype: "Fixed Dentures");
                     appState.setProcedureDateTime(selectedDateTime, TimeOfDay.fromDateTime(selectedDateTime));
 
@@ -232,6 +245,15 @@ class _ProsthesisTypeSelectorState extends State<ProsthesisTypeSelector> {
                   final selectedDateTime = await showDateTimePicker(context);
                   if (selectedDateTime != null) {
                     final appState = Provider.of<AppState>(context, listen: false);
+                    final username = appState.username ?? '';
+                    
+                    // Check for ongoing treatment before proceeding
+                    final hasOngoing = await widget.checkForOngoingTreatment('Prosthesis Fitted', username);
+                    if (hasOngoing) {
+                      widget.showOngoingTreatmentSnackBar('Prosthesis Fitted');
+                      return;
+                    }
+                    
                     appState.setTreatment('Prosthesis Fitted', subtype: "Removable Dentures");
                     appState.setProcedureDateTime(selectedDateTime, TimeOfDay.fromDateTime(selectedDateTime));
 
@@ -312,6 +334,8 @@ class ImplantTypeSelector extends StatelessWidget {
   final VoidCallback onBackToTreatment;
   final DateTime selectedDate;
   final TimeOfDay selectedTime;
+  final Future<bool> Function(String, String) checkForOngoingTreatment;
+  final Function(String) showOngoingTreatmentSnackBar;
 
   const ImplantTypeSelector({
     Key? key,
@@ -321,6 +345,8 @@ class ImplantTypeSelector extends StatelessWidget {
     this.selectedStage,
     this.onContinue,
     required this.onBackToTreatment,
+    required this.checkForOngoingTreatment,
+    required this.showOngoingTreatmentSnackBar,
   }) : super(key: key);
 
   double _iconSize(BuildContext context) {
@@ -496,6 +522,34 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
   int? _selectedFractureOptionIndex;
   String? _selectedImplantStage;
 
+  // Helper function to check for ongoing treatment of the same type
+  Future<bool> _checkForOngoingTreatment(String selectedTreatment, String username) async {
+    try {
+      final history = await ApiService.getEpisodeHistory();
+      if (history == null) return false;
+      
+      return history.any((episode) => 
+        episode['treatment'] == selectedTreatment && 
+        episode['procedure_completed'] == false && 
+        episode['username'] == username
+      );
+    } catch (e) {
+      print('Error checking for ongoing treatment: $e');
+      return false; // Allow treatment if there's an error checking
+    }
+  }
+
+  // Helper function to show ongoing treatment SnackBar
+  void _showOngoingTreatmentSnackBar(String treatment) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("You already have an ongoing $treatment. Please complete it first."),
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   final treatments = [
     {'label': 'Tooth Taken Out', 'icon': Icons.medical_services},
     {'label': 'Prosthesis Fitted', 'icon': Icons.view_module},
@@ -592,6 +646,14 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
               Provider.of<AppState>(context, listen: false);
               final subtype =
               fractureOptions[_selectedFractureOptionIndex!]['label'] as String;
+              final username = appState.username ?? widget.userName;
+              
+              // Check for ongoing treatment before proceeding
+              final hasOngoing = await _checkForOngoingTreatment('Tooth Fracture', username);
+              if (hasOngoing) {
+                _showOngoingTreatmentSnackBar('Tooth Fracture');
+                return;
+              }
 
               appState.setTreatment("Tooth Fracture", subtype: subtype);
               appState.setProcedureDateTime(
@@ -670,6 +732,8 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
                 }
               }
             },
+            checkForOngoingTreatment: _checkForOngoingTreatment,
+            showOngoingTreatmentSnackBar: _showOngoingTreatmentSnackBar,
             onBackToTreatment: () {
               setState(() {
                 _selectedIndex = null;
@@ -730,6 +794,15 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
               );
 
               final appState = Provider.of<AppState>(context, listen: false);
+              final username = appState.username ?? widget.userName;
+              
+              // Check for ongoing treatment before proceeding
+              final hasOngoing = await _checkForOngoingTreatment('Implant', username);
+              if (hasOngoing) {
+                _showOngoingTreatmentSnackBar('Implant');
+                return;
+              }
+              
               appState.setTreatment('Implant', subtype: _selectedImplantStage);
               appState.setProcedureDateTime(selectedDateTime, TimeOfDay.fromDateTime(selectedDateTime));
 
@@ -757,6 +830,8 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
                 );
               }
             },
+            checkForOngoingTreatment: _checkForOngoingTreatment,
+            showOngoingTreatmentSnackBar: _showOngoingTreatmentSnackBar,
             onBackToTreatment: () {
               setState(() {
                 _selectedIndex = null;
@@ -946,6 +1021,14 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
                             initialTime: TimeOfDay.now(),
                           );
                           if (procedureTime == null) return;
+                          
+                          // Check for ongoing treatment before proceeding
+                          final hasOngoing = await _checkForOngoingTreatment(selectedTreatment, username);
+                          if (hasOngoing) {
+                            _showOngoingTreatmentSnackBar(selectedTreatment);
+                            return;
+                          }
+                          
                           final procedureDateTime = DateTime(
                             procedureDate.year,
                             procedureDate.month,
@@ -995,6 +1078,14 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
                                 procedureTime.hour,
                                 procedureTime.minute,
                               );
+                              
+                              // Check for ongoing treatment before proceeding
+                              final hasOngoing = await _checkForOngoingTreatment(selectedTreatment, username);
+                              if (hasOngoing) {
+                                _showOngoingTreatmentSnackBar(selectedTreatment);
+                                return;
+                              }
+                              
                               appState.setTreatment(
                                 selectedTreatment,
                                 procedureDate: selectedDateTime,
@@ -1041,6 +1132,14 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
                               ).then((time) async {
                                 if (time != null) {
                                   procedureTime = time;
+                                  
+                                  // Check for ongoing treatment before proceeding
+                                  final hasOngoing = await _checkForOngoingTreatment(selectedTreatment, username);
+                                  if (hasOngoing) {
+                                    _showOngoingTreatmentSnackBar(selectedTreatment);
+                                    return;
+                                  }
+                                  
                                   appState.setProcedureDateTime(
                                       procedureDate!, procedureTime!);
                                   appState.setTreatment(selectedTreatment);
