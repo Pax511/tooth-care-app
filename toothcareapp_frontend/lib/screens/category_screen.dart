@@ -144,7 +144,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
   // Calls your backend to store department and doctor!
   Future<void> saveDepartmentDoctor(
       String username, String department, String doctor) async {
-    final url = Uri.parse('http://170.31.0.100:8000/department-doctor');
+    final url = Uri.parse('https://tooth-care-app.onrender.com/department-doctor');
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('token');
 

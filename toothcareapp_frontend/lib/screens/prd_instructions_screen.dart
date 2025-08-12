@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import 'home_screen.dart';
+import 'treatment_screen.dart';
 
 class PRDInstructionsScreen extends StatefulWidget {
   final DateTime date;
@@ -74,194 +75,292 @@ class _PRDInstructionsScreenState extends State<PRDInstructionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
-    final treatment = appState.treatment;
-    final subtype = appState.treatmentSubtype;
-
-    String title = "General Instructions";
-    if (treatment != null) {
-      title =
-      "Instructions (${treatment}${subtype != null && subtype.isNotEmpty ? " - $subtype" : ""})";
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Padding(
-              padding:
-              const EdgeInsets.symmetric(vertical: 40.0, horizontal: 8.0),
-              child: Column(
-                children: [
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    color: const Color(0xFFF6F2FD),
-                    child: Padding(
-                      padding: const EdgeInsets.all(28.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "$title (Day $currentDay)",
-                            style: const TextStyle(
-                                fontSize: 22, fontWeight: FontWeight.bold),
+    if (currentDay >= totalDays) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF9FAFB),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Animated check/celebration
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: 1),
+                  duration: const Duration(milliseconds: 800),
+                  curve: Curves.easeOutBack,
+                  builder: (context, value, child) => Transform.scale(
+                    scale: value,
+                    child: child,
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      shape: BoxShape.circle,
+                    ),
+                    padding: const EdgeInsets.all(22),
+                    child: const Icon(Icons.emoji_events_rounded, color: Color(0xFF2ECC71), size: 64),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                // Elevated card for message
+                Card(
+                  elevation: 6,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 28),
+                    child: Column(
+                      children: const [
+                        Text(
+                          "Recovery Complete!",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF222B45),
+                            letterSpacing: 1.1,
                           ),
-                          const SizedBox(height: 20),
-                          Row(
-                            children: [
-                              Icon(Icons.check_circle, color: Colors.green[600]),
-                              const SizedBox(width: 8),
-                              Text(
-                                "Do's (Day $currentDay)",
-                                style: const TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18),
-                              ),
-                            ],
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          "Congratulations! Your procedure recovery is complete. You can now select a new treatment.",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF6B7280),
                           ),
-                          const SizedBox(height: 8),
-                          ...List.generate(prdDos.length, (i) => Padding(
-                            padding: const EdgeInsets.only(
-                                left: 8, top: 0, bottom: 0),
-                            child: CheckboxListTile(
-                              contentPadding: const EdgeInsets.only(
-                                  left: 20, right: 0),
-                              controlAffinity:
-                              ListTileControlAffinity.leading,
-                              dense: true,
-                              title: Text(prdDos[i],
-                                  style:
-                                  const TextStyle(fontSize: 15)),
-                              value: _dosChecked[i],
-                              onChanged: (bool? value) {
-                                _updateChecklist(i, value ?? false);
-                              },
-                              activeColor: Colors.green,
-                              checkboxShape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(5),
-                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 34),
+                // Modern rounded button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.assignment_turned_in_rounded, size: 22),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0052CC),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 3,
+                      textStyle: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 0.2,
+                      ),
+                    ),
+                    label: const Text("Select Different Treatment"),
+                    onPressed: () {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => TreatmentScreenMain(userName: "User")),
+                            (route) => false,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }else {
+      final appState = Provider.of<AppState>(context);
+      final treatment = appState.treatment;
+      final subtype = appState.treatmentSubtype;
+
+      String title = "General Instructions";
+      if (treatment != null) {
+        title =
+        "Instructions (${treatment}${subtype != null && subtype.isNotEmpty
+            ? " - $subtype"
+            : ""})";
+      }
+
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: SingleChildScrollView(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding:
+                const EdgeInsets.symmetric(vertical: 40.0, horizontal: 8.0),
+                child: Column(
+                  children: [
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      color: const Color(0xFFF6F2FD),
+                      child: Padding(
+                        padding: const EdgeInsets.all(28.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "$title (Day $currentDay)",
+                              style: const TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.bold),
                             ),
-                          )),
-                          const SizedBox(height: 18),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFE6E6),
-                              borderRadius: BorderRadius.circular(10),
+                            const SizedBox(height: 20),
+                            Row(
+                              children: [
+                                Icon(Icons.check_circle,
+                                    color: Colors.green[600]),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Do's (Day $currentDay)",
+                                  style: const TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18),
+                                ),
+                              ],
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12.0, horizontal: 10),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: const [
-                                      Icon(Icons.cancel, color: Colors.red),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        "Don'ts",
-                                        style: TextStyle(
-                                            color: Colors.red,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 18),
-                                      ),
-                                    ],
+                            const SizedBox(height: 8),
+                            ...List.generate(prdDos.length, (i) =>
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      left: 8, top: 0, bottom: 0),
+                                  child: CheckboxListTile(
+                                    contentPadding: const EdgeInsets.only(
+                                        left: 20, right: 0),
+                                    controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                    dense: true,
+                                    title: Text(prdDos[i],
+                                        style:
+                                        const TextStyle(fontSize: 15)),
+                                    value: _dosChecked[i],
+                                    onChanged: (bool? value) {
+                                      _updateChecklist(i, value ?? false);
+                                    },
+                                    activeColor: Colors.green,
+                                    checkboxShape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  ...prdDonts.map((item) => Padding(
-                                    padding: const EdgeInsets.only(
-                                        left: 28, top: 4, bottom: 4),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.close,
-                                            color: Colors.red, size: 18),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(item,
-                                              style: const TextStyle(
-                                                  fontSize: 15)),
-                                        )
+                                )),
+                            const SizedBox(height: 18),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFE6E6),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12.0, horizontal: 10),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: const [
+                                        Icon(Icons.cancel, color: Colors.red),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          "Don'ts",
+                                          style: TextStyle(
+                                              color: Colors.red,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18),
+                                        ),
                                       ],
                                     ),
-                                  )),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 22),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.menu_book,
-                                  color: Colors.white),
-                              label: const Text(
-                                "View Specific Instructions",
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                const Color(0xFFFFA500), // Orange color
-                                padding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                    const SizedBox(height: 8),
+                                    ...prdDonts.map((item) =>
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              left: 28, top: 4, bottom: 4),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.close,
+                                                  color: Colors.red, size: 18),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(item,
+                                                    style: const TextStyle(
+                                                        fontSize: 15)),
+                                              )
+                                            ],
+                                          ),
+                                        )),
+                                  ],
                                 ),
                               ),
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                    const PrdSpecificInstructionsScreen(),
-                                  ),
-                                );
-                              },
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[700],
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                            const SizedBox(height: 22),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.menu_book,
+                                    color: Colors.white),
+                                label: const Text(
+                                  "View Specific Instructions",
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                  const Color(0xFFFFA500), // Orange color
+                                  padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                      const PrdSpecificInstructionsScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 15),
                       ),
-                      child: const Text(
-                        "Continue to Dashboard",
-                        style: TextStyle(
-                            fontSize: 17, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(
-                              builder: (_) => const HomeScreen()),
-                              (route) => false,
-                        );
-                      },
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[700],
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        child: const Text(
+                          "Continue to Dashboard",
+                          style: TextStyle(
+                              fontSize: 17, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                                builder: (_) => const HomeScreen()),
+                                (route) => false,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
   }
 }
 

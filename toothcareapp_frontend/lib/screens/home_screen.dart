@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'treatment_history_screen.dart';
 import '../app_state.dart';
+import '../services/api_service.dart';
 import 'calendar_screen.dart';
 import 'tto_instructions_screen.dart';
 import 'pfd_instructions_screen.dart';
@@ -135,6 +137,18 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
+          // --- Treatment History Icon Button ---
+          // In your AppBar actions in home_screen.dart:
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.blueAccent),
+            tooltip: 'View Treatment History',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TreatmentHistoryScreen()),
+              );
+            },
+          ),
+          // --- Existing menu icon ---
           IconButton(
             icon: const Icon(Icons.menu),
             onPressed: () {
