@@ -348,3 +348,24 @@ async def rotate_if_due_endpoint(db: AsyncSession = Depends(get_db), current_use
     if new_id is None:
         return schemas.RotateIfDueResponse(rotated=False, new_episode_id=None)
     return schemas.RotateIfDueResponse(rotated=True, new_episode_id=new_id)
+
+@app.post("/signup")
+async def signup(request: Request, db: AsyncSession = Depends(get_db)):
+    try:
+        # ...your signup logic...
+        await db.commit()
+        return {"message": "Signup successful"}
+    except IntegrityError as e:
+        # Phone, username, or email unique constraint error
+        if 'patients_phone_key' in str(e.orig):
+            raise HTTPException(status_code=400, detail="Phone number already exists")
+        elif 'patients_username_key' in str(e.orig):
+            raise HTTPException(status_code=400, detail="Username already exists")
+        elif 'patients_email_key' in str(e.orig):
+            raise HTTPException(status_code=400, detail="Email already exists")
+        else:
+            raise HTTPException(status_code=400, detail="Duplicate entry")
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail="Invalid input: " + str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Server error. Please try again later.")
