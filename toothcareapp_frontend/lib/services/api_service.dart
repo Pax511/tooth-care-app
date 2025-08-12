@@ -1,10 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://170.31.0.100:8000';
+  static const String baseUrl = 'https://tooth-care-app.onrender.com';
 
   // --------------------------
   // ✅ Save Token Helper
@@ -39,7 +40,7 @@ class ApiService {
   }
 
   // --------------------------
-  // ✅ SIGNUP
+  // ✅ SIGNUP (Improved)
   // --------------------------
   static Future<String?> register(Map<String, dynamic> data) async {
     try {
@@ -58,18 +59,21 @@ class ApiService {
         return null;
       } else {
         try {
-          return jsonDecode(response.body)['detail'] ?? "Signup failed";
+          final detail = jsonDecode(response.body)['detail'];
+          return _mapSignupError(detail);
         } catch (_) {
-          return "Signup failed: ${response.body}";
+          return "Signup failed. Please try again.";
         }
       }
-    } catch (e) {
-      return "Signup error: $e";
+    } on SocketException {
+      return "Unable to connect. Please check your internet connection.";
+    } catch (_) {
+      return "An unexpected error occurred. Please try again.";
     }
   }
 
   // --------------------------
-  // ✅ LOGIN
+  // ✅ LOGIN (Improved)
   // --------------------------
   static Future<String?> login(String username, String password) async {
     try {
@@ -91,15 +95,33 @@ class ApiService {
         return null;
       } else {
         try {
-          final resBody = jsonDecode(response.body);
-          return resBody['detail'] ?? "Login failed";
+          final detail = jsonDecode(response.body)['detail'];
+          return _mapLoginError(detail);
         } catch (_) {
-          return "Login failed: ${response.body}";
+          return "Login failed. Please try again.";
         }
       }
-    } catch (e) {
-      return "Login error: $e";
+    } on SocketException {
+      return "Unable to connect. Please check your internet connection.";
+    } catch (_) {
+      return "An unexpected error occurred. Please try again.";
     }
+  }
+
+  // Helper: Map backend signup errors to user-friendly messages
+  static String _mapSignupError(String? detail) {
+    if (detail == null) return "Signup failed. Please try again.";
+    if (detail.contains("Username already exists")) return "This username is already taken. Please choose another.";
+    if (detail.contains("email already exists")) return "This email is already registered. Try logging in or use another email.";
+    if (detail.toLowerCase().contains("weak password")) return "Password is too weak. Please choose a stronger password.";
+    return detail;
+  }
+
+  // Helper: Map backend login errors to user-friendly messages
+  static String _mapLoginError(String? detail) {
+    if (detail == null) return "Login failed. Please try again.";
+    if (detail.contains("Incorrect username or password")) return "Incorrect username or password.";
+    return detail;
   }
 
   // --------------------------
@@ -208,6 +230,25 @@ class ApiService {
     }
   }
 
+  static Future<List<dynamic>?> getEpisodeHistory() async {
+    try {
+      final headers = await getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/episodes/history'),
+        headers: headers,
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        print('Get episode history failed: ${response.statusCode} → ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Get episode history error: $e');
+      return null;
+    }
+  }
+
   // ---------------------------
   // ✅ Save Treatment Info
   // ---------------------------
@@ -250,3 +291,5 @@ class ApiService {
     }
   }
 }
+// Add this inside your ApiService class
+

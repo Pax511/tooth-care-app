@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import 'home_screen.dart';
+import 'treatment_screen.dart';
 
 class RootCanalInstructionsScreen extends StatefulWidget {
   final DateTime date;
@@ -71,146 +72,254 @@ class _RootCanalInstructionsScreenState extends State<RootCanalInstructionsScree
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
-    final treatment = appState.treatment;
-    final subtype = appState.treatmentSubtype;
-
-    String title = "General Instructions";
-    if (treatment != null) {
-      title = "Instructions (${treatment}${subtype != null && subtype.isNotEmpty ? " - $subtype" : ""})";
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "$title (Day $currentDay)",
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold),
+    int currentDay = totalDays; // at the start of build() or where currentDay is set
+    if (currentDay >= totalDays) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF9FAFB),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Animated check/celebration
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: 1),
+                  duration: const Duration(milliseconds: 800),
+                  curve: Curves.easeOutBack,
+                  builder: (context, value, child) => Transform.scale(
+                    scale: value,
+                    child: child,
                   ),
-                  const SizedBox(height: 20),
-                  Container(
+                  child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Colors.green.shade200, width: 2),
-                      borderRadius: BorderRadius.circular(10),
+                      color: Colors.green[50],
+                      shape: BoxShape.circle,
                     ),
-                    margin: const EdgeInsets.only(bottom: 20),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green[700],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              "General Instructions (Day $currentDay)",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                    padding: const EdgeInsets.all(22),
+                    child: const Icon(Icons.emoji_events_rounded, color: Color(0xFF2ECC71), size: 64),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                // Elevated card for message
+                Card(
+                  elevation: 6,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 28),
+                    child: Column(
+                      children: const [
+                        Text(
+                          "Recovery Complete!",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF222B45),
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          "Congratulations! Your procedure recovery is complete. You can now select a new treatment.",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF6B7280),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 34),
+                // Modern rounded button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.assignment_turned_in_rounded, size: 22),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0052CC),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 3,
+                      textStyle: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 0.2,
+                      ),
+                    ),
+                    label: const Text("Select Different Treatment"),
+                    onPressed: () {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => TreatmentScreenMain(userName: "User")),
+                            (route) => false,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }else {
+      final appState = Provider.of<AppState>(context);
+      final treatment = appState.treatment;
+      final subtype = appState.treatmentSubtype;
+
+      String title = "General Instructions";
+      if (treatment != null) {
+        title =
+        "Instructions (${treatment}${subtype != null && subtype.isNotEmpty
+            ? " - $subtype"
+            : ""})";
+      }
+
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: SingleChildScrollView(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    vertical: 40.0, horizontal: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "$title (Day $currentDay)",
+                      style: const TextStyle(
+                          fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: Colors.green.shade200,
+                            width: 2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 8.0, horizontal: 16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green[700],
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                "General Instructions (Day $currentDay)",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          ...List.generate(
-                            generalInstructions.length,
-                                (i) => Padding(
-                              padding: const EdgeInsets.only(left: 4),
-                              child: CheckboxListTile(
-                                value: _generalChecked[i],
-                                onChanged: (val) => _updateGeneral(i, val),
-                                contentPadding: EdgeInsets.zero,
-                                controlAffinity: ListTileControlAffinity.leading,
-                                dense: true,
-                                title: Text(
-                                  generalInstructions[i],
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.w600,
+                            const SizedBox(height: 8),
+                            ...List.generate(
+                              generalInstructions.length,
+                                  (i) =>
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4),
+                                    child: CheckboxListTile(
+                                      value: _generalChecked[i],
+                                      onChanged: (val) =>
+                                          _updateGeneral(i, val),
+                                      contentPadding: EdgeInsets.zero,
+                                      controlAffinity: ListTileControlAffinity
+                                          .leading,
+                                      dense: true,
+                                      title: Text(
+                                        generalInstructions[i],
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      activeColor: Colors.green,
+                                      checkboxShape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                activeColor: Colors.green,
-                                checkboxShape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.menu_book, color: Colors.white),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber[700],
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          ],
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      label: const Text(
-                        "View Specific Instructions",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const RootCanalSpecificInstructionsScreen(),
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.menu_book, color: Colors.white),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber[700],
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[700],
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        label: const Text(
+                          "View Specific Instructions",
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (
+                                  _) => const RootCanalSpecificInstructionsScreen(),
+                            ),
+                          );
+                        },
                       ),
-                      child: const Text(
-                        "Continue to Dashboard",
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const HomeScreen()),
-                              (route) => false,
-                        );
-                      },
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[700],
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        child: const Text(
+                          "Continue to Dashboard",
+                          style: TextStyle(
+                              fontSize: 17, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                                builder: (_) => const HomeScreen()),
+                                (route) => false,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
   }
 }
 

@@ -1,10 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart'; // adjust if path is different
 
 class WelcomeScreen extends StatefulWidget {
-  final Function(
+  final Future<void> Function(
       BuildContext context,
       String username,
       String password,
@@ -16,7 +17,7 @@ class WelcomeScreen extends StatefulWidget {
       VoidCallback switchToLogin,
       ) onSignUp;
 
-  final Function(
+  final Future<void> Function(
       BuildContext context,
       String username,
       String password,
@@ -48,40 +49,91 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   String _loginPassword = '';
 
   bool _showSignUp = true;
+  bool _isLoading = false;
+
+  // ADD: HIPAA Agreement checkbox state
+  bool _agreedToHipaa = false;
 
   void _toggleForm() {
     setState(() {
       _showSignUp = !_showSignUp;
       _signUpFormKey.currentState?.reset();
       _loginFormKey.currentState?.reset();
+      _agreedToHipaa = false; // reset checkbox when switching forms
     });
   }
 
-  void _handleSignUp() {
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleSignUp() async {
+    if (!_agreedToHipaa) {
+      _showErrorDialog("Agreement Required", "You must agree to the HIPAA disclaimer before signing up.");
+      return;
+    }
     if (_signUpFormKey.currentState?.validate() ?? false) {
       _signUpFormKey.currentState!.save();
-      widget.onSignUp(
-        context,
-        _signupUsername,
-        _signupPassword,
-        _signupPhone,
-        _signupEmail,
-        _signupName,
-        _signupDob,
-        _signupGender,
-        _toggleForm,
-      );
+      setState(() => _isLoading = true);
+      try {
+        await widget.onSignUp(
+          context,
+          _signupUsername,
+          _signupPassword,
+          _signupPhone,
+          _signupEmail,
+          _signupName,
+          _signupDob,
+          _signupGender,
+          _toggleForm,
+        );
+      } on SocketException {
+        _showErrorDialog("Network Error", "Unable to connect. Please check your internet connection.");
+      } on SignUpUsernameTakenException {
+        _showErrorDialog("Sign Up Failed", "This username is already taken. Please choose another.");
+      } on SignUpEmailTakenException {
+        _showErrorDialog("Sign Up Failed", "This email is already registered. Try logging in or use another email.");
+      } on SignUpWeakPasswordException {
+        _showErrorDialog("Sign Up Failed", "Password is too weak. Please choose a stronger password.");
+      } catch (e) {
+        _showErrorDialog("Error", "An unexpected error occurred. Please try again.");
+      } finally {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     if (_loginFormKey.currentState?.validate() ?? false) {
       _loginFormKey.currentState!.save();
-      widget.onLogin(
-        context,
-        _loginUsername,
-        _loginPassword,
-      );
+      setState(() => _isLoading = true);
+      try {
+        await widget.onLogin(
+          context,
+          _loginUsername,
+          _loginPassword,
+        );
+      } on SocketException {
+        _showErrorDialog("Network Error", "Unable to connect. Please check your internet connection.");
+      } on InvalidCredentialsException {
+        _showErrorDialog("Login Failed", "Incorrect username or password.");
+      } catch (e) {
+        _showErrorDialog("Error", "An unexpected error occurred. Please try again.");
+      } finally {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -123,8 +175,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                _showSignUp ? _buildSignUpForm() : _buildLoginForm(),
-                const SizedBox(height: 16),
+                _isLoading
+                    ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32.0),
+                  child: CircularProgressIndicator(),
+                )
+                    : _showSignUp
+                    ? _buildSignUpForm()
+                    : _buildLoginForm(),
+                const SizedBox(height: 12),
                 TextButton(
                   onPressed: _toggleForm,
                   child: Text(
@@ -236,8 +295,85 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             onSaved: (v) => _signupEmail = v ?? '',
           ),
           const SizedBox(height: 20),
+          // HIPAA Agreement Checkbox (must be checked)
+          CheckboxListTile(
+            value: _agreedToHipaa,
+            onChanged: (value) {
+              setState(() {
+                _agreedToHipaa = value ?? false;
+              });
+            },
+            title: GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text('HIPAA Disclaimer'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Your privacy is important to us. We comply with the Health Insurance Portability and Accountability Act (HIPAA), which requires us to maintain the privacy and security of your health information.",
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            "• All health information you provide is encrypted and securely stored.",
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            "• We will not share your personal health information with anyone except as required by law or as necessary for your care.",
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            "• You have the right to access, amend, and receive an accounting of disclosures of your health information.",
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            "• For more details, please review our Privacy Policy.",
+                          ),
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text('Close'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue[800], size: 20),
+                  SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      'I agree to the HIPAA Disclaimer',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                        fontSize: 14,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'By signing up, you agree your data will be used in compliance with HIPAA and our Privacy Policy.',
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: _handleSignUp,
+            onPressed: _isLoading ? null : _handleSignUp,
             child: const Text("Sign Up"),
           ),
         ],
@@ -271,7 +407,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           ),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: _handleLogin,
+            onPressed: _isLoading ? null : _handleLogin,
             child: const Text("Login"),
           ),
         ],
@@ -279,3 +415,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     );
   }
 }
+
+// Exception classes for demonstration; implement, import, or adapt as needed in your codebase.
+class InvalidCredentialsException implements Exception {}
+class SignUpUsernameTakenException implements Exception {}
+class SignUpEmailTakenException implements Exception {}
+class SignUpWeakPasswordException implements Exception {}
