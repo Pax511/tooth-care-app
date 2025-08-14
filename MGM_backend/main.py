@@ -5,19 +5,20 @@ from typing import List, Optional
 import models
 from database import get_db
 
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select  # SQLAlchemy 2.x
 
-# You will need to import your schemas and engine as well:
 import schemas
 from database import engine
+
+# Import the email sending function from utils.py
+from utils import send_registration_email
 
 app = FastAPI()
 
@@ -187,6 +188,12 @@ async def signup(patient: schemas.PatientCreate, db: AsyncSession = Depends(get_
     ep = await _get_or_create_open_episode(db, db_patient.id)
     await _mirror_episode_to_patient(db, db_patient, ep)
 
+    # Send registration confirmation email (non-blocking, errors don't stop user creation)
+    try:
+        send_registration_email(db_patient.email, db_patient.name)
+    except Exception as e:
+        print(f"Email sending failed: {e}")
+
     access_token = create_access_token(data={"sub": db_patient.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -348,24 +355,3 @@ async def rotate_if_due_endpoint(db: AsyncSession = Depends(get_db), current_use
     if new_id is None:
         return schemas.RotateIfDueResponse(rotated=False, new_episode_id=None)
     return schemas.RotateIfDueResponse(rotated=True, new_episode_id=new_id)
-
-@app.post("/signup")
-async def signup(request: Request, db: AsyncSession = Depends(get_db)):
-    try:
-        # ...your signup logic...
-        await db.commit()
-        return {"message": "Signup successful"}
-    except IntegrityError as e:
-        # Phone, username, or email unique constraint error
-        if 'patients_phone_key' in str(e.orig):
-            raise HTTPException(status_code=400, detail="Phone number already exists")
-        elif 'patients_username_key' in str(e.orig):
-            raise HTTPException(status_code=400, detail="Username already exists")
-        elif 'patients_email_key' in str(e.orig):
-            raise HTTPException(status_code=400, detail="Email already exists")
-        else:
-            raise HTTPException(status_code=400, detail="Duplicate entry")
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail="Invalid input: " + str(e))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Server error. Please try again later.")
