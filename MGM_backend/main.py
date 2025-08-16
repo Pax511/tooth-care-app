@@ -104,14 +104,20 @@ async def _get_or_create_open_episode(db: AsyncSession, patient_id: int) -> mode
         select(models.TreatmentEpisode)
         .where(
             models.TreatmentEpisode.patient_id == patient_id,
-            models.TreatmentEpisode.locked == False,  # noqa: E712
+            models.TreatmentEpisode.locked == False,
         )
         .order_by(models.TreatmentEpisode.id.desc())
     )
     res = await db.execute(stmt)
-    ep = res.scalar_one_or_none()
-    if ep:
-        return ep
+    open_episodes = res.scalars().all()
+    if open_episodes:
+        # If more than one open episode, lock all but the most recent
+        for ep in open_episodes[1:]:
+            ep.locked = True
+            db.add(ep)
+        if len(open_episodes) > 1:
+            await db.commit()
+        return open_episodes[0]
 
     new_ep = models.TreatmentEpisode(
         patient_id=patient_id,
