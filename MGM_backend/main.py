@@ -180,11 +180,29 @@ async def _rotate_if_due(db: AsyncSession, patient: models.Patient) -> Optional[
 
 @app.post("/signup", response_model=schemas.TokenResponse)
 async def signup(patient: schemas.PatientCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(models.Patient).where(models.Patient.username == patient.username))
-    existing_user = result.scalar_one_or_none()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already exists")
+    # Check for duplicates
+    errors = {}
 
+    # Username
+    result = await db.execute(select(models.Patient).where(models.Patient.username == patient.username))
+    if result.scalar_one_or_none():
+        errors["username"] = "This username is already taken. Please choose another."
+
+    # Email
+    result = await db.execute(select(models.Patient).where(models.Patient.email == patient.email))
+    if result.scalar_one_or_none():
+        errors["email"] = "This email is already registered. Please use another."
+
+    # Phone
+    result = await db.execute(select(models.Patient).where(models.Patient.phone == patient.phone))
+    if result.scalar_one_or_none():
+        errors["phone"] = "This phone number is already registered. Please use another."
+
+    if errors:
+        # Return all field errors in one response
+        raise HTTPException(status_code=400, detail=errors)
+
+    # Continue with registration as before
     hashed_pw = get_password_hash(patient.password)
     db_patient = models.Patient(**patient.dict(exclude={"password"}), password=hashed_pw)
     db.add(db_patient)
@@ -194,7 +212,6 @@ async def signup(patient: schemas.PatientCreate, db: AsyncSession = Depends(get_
     ep = await _get_or_create_open_episode(db, db_patient.id)
     await _mirror_episode_to_patient(db, db_patient, ep)
 
-    # Send registration confirmation email (non-blocking, errors don't stop user creation)
     try:
         send_registration_email(db_patient.email, db_patient.name)
     except Exception as e:
