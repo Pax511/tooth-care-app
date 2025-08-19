@@ -20,7 +20,12 @@ from database import engine
 # Import the email sending function from utils.py
 from utils import send_registration_email
 
+from fastapi import FastAPI
+from routes import auth  # Add this import
+
 app = FastAPI()
+
+app.include_router(auth.router)
 
 app.add_middleware(
     CORSMiddleware,

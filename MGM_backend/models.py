@@ -2,8 +2,11 @@ from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Bool
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-# IMPORTANT: import Base from the package's database module
 from database import Base
+
+# Secure password hashing
+from passlib.context import CryptContext
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class Patient(Base):
     __tablename__ = "patients"
@@ -30,6 +33,12 @@ class Patient(Base):
     instruction_statuses = relationship("InstructionStatus", back_populates="patient", cascade="all, delete-orphan")
     episodes = relationship("TreatmentEpisode", back_populates="patient", cascade="all, delete-orphan")
 
+    def set_password(self, raw_password):
+        self.password = pwd_context.hash(raw_password)
+
+    def verify_password(self, raw_password):
+        return pwd_context.verify(raw_password, self.password)
+
 class TreatmentEpisode(Base):
     __tablename__ = "treatment_episodes"
     id = Column(Integer, primary_key=True, index=True)
@@ -54,6 +63,12 @@ class Doctor(Base):
     password = Column(String, nullable=False)
     appointments = relationship("Appointment", back_populates="doctor", cascade="all, delete-orphan")
     doctor_feedbacks = relationship("DoctorFeedback", back_populates="doctor", cascade="all, delete-orphan")
+
+    def set_password(self, raw_password):
+        self.password = pwd_context.hash(raw_password)
+
+    def verify_password(self, raw_password):
+        return pwd_context.verify(raw_password, self.password)
 
 class Appointment(Base):
     __tablename__ = "appointments"

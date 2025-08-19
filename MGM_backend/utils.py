@@ -6,6 +6,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 
+
+
 def send_registration_email(to_email, user_name):
     EMAIL_HOST = os.getenv("EMAIL_HOST")
     EMAIL_PORT = int(os.getenv("EMAIL_PORT"))
@@ -36,6 +38,26 @@ def send_registration_email(to_email, user_name):
         print(f"Could not send email: {e}")
         return False
 
+
+def send_email(to_email, subject, body):
+    # Replace with your SMTP settings
+    smtp_server = "smtp.example.com"
+    smtp_port = 587
+    smtp_user = "your@email.com"
+    smtp_password = "yourpassword"
+
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = smtp_user
+    msg["To"] = to_email
+
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.sendmail(smtp_user, [to_email], msg.as_string())
+
+
+        
 # Use environment for secrets if possible
 SECRET_KEY = os.getenv("SECRET_KEY", "Priyans3628p")
 ALGORITHM = "HS256"
