@@ -180,26 +180,24 @@ async def _rotate_if_due(db: AsyncSession, patient: models.Patient) -> Optional[
 
 @app.post("/signup", response_model=schemas.TokenResponse)
 async def signup(patient: schemas.PatientCreate, db: AsyncSession = Depends(get_db)):
-    # Check for duplicates
     errors = {}
 
-    # Username
-    result = await db.execute(select(models.Patient).where(models.Patient.username == patient.username))
-    if result.scalar_one_or_none():
-        errors["username"] = "This username is already taken. Please choose another."
+    # Check username
+    res = await db.execute(select(models.Patient).where(models.Patient.username == patient.username))
+    if res.scalar_one_or_none():
+        errors["username"] = "Username already exists"
 
-    # Email
-    result = await db.execute(select(models.Patient).where(models.Patient.email == patient.email))
-    if result.scalar_one_or_none():
-        errors["email"] = "This email is already registered. Please use another."
+    # Check email
+    res = await db.execute(select(models.Patient).where(models.Patient.email == patient.email))
+    if res.scalar_one_or_none():
+        errors["email"] = "Email already exists"
 
-    # Phone
-    result = await db.execute(select(models.Patient).where(models.Patient.phone == patient.phone))
-    if result.scalar_one_or_none():
-        errors["phone"] = "This phone number is already registered. Please use another."
+    # Check phone
+    res = await db.execute(select(models.Patient).where(models.Patient.phone == patient.phone))
+    if res.scalar_one_or_none():
+        errors["phone"] = "Phone number already exists"
 
     if errors:
-        # Return all field errors in one response
         raise HTTPException(status_code=400, detail=errors)
 
     # Continue with registration as before
