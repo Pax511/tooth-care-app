@@ -27,12 +27,16 @@ def request_reset(data: RequestResetSchema, db: Session = Depends(get_db)):
     if not target:
         raise HTTPException(status_code=400, detail="Email or phone required.")
 
-    # Find user by email or phone
+    # Try both Patient and Doctor
     user = None
     if data.email:
         user = db.query(Patient).filter(Patient.email == data.email).first()
+        if not user:
+            user = db.query(Doctor).filter(Doctor.email == data.email).first()
     else:
-        user = db.query(User).filter(User.phone == data.phone).first()
+        user = db.query(Patient).filter(Patient.phone == data.phone).first()
+        if not user:
+            user = db.query(Doctor).filter(Doctor.phone == data.phone).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
@@ -40,15 +44,18 @@ def request_reset(data: RequestResetSchema, db: Session = Depends(get_db)):
     otp_store[target] = otp
 
     # --- Send OTP via email or SMS here ---
-    if data.email:
-        # Use your email utility here
-        from utils import send_email  # You must implement send_email!
-        send_email(data.email, "Your OTP", f"Your OTP code is {otp}")
-    else:
-        # For SMS, integrate with Twilio or similar
-        print(f"Send SMS to {data.phone}: OTP code is {otp}")
+    try:
+        if data.email:
+            from utils import send_email
+            send_email(data.email, "Your OTP", f"Your OTP code is {otp}")
+        else:
+            print(f"Send SMS to {data.phone}: OTP code is {otp}")
+    except Exception as e:
+        print(f"Failed to send OTP: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send OTP. Please try again later.")
 
     return {"message": "OTP sent"}
+
 
 @router.post("/auth/verify-otp")
 def verify_otp(data: VerifyOtpSchema, db: Session = Depends(get_db)):
