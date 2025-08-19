@@ -12,16 +12,13 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select  # SQLAlchemy 2.x
+from sqlalchemy import select
 
 import schemas
 from database import engine
 
-# Import the email sending function from utils.py
 from utils import send_registration_email
-
-from fastapi import FastAPI
-from routes import auth  # Add this import
+from routes import auth
 
 app = FastAPI()
 
@@ -45,7 +42,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 90  # 90 days
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 doctor_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/doctor-login")
 
 def verify_password(plain_password, hashed_password):
@@ -75,7 +72,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         raise cred_exc
 
     result = await db.execute(select(models.Patient).where(models.Patient.username == username))
-    user = result.scalar_one_or_none()
+    user = result.scalars().first()
     if user is None:
         raise cred_exc
     return user
@@ -95,7 +92,7 @@ async def get_current_doctor(token: str = Depends(doctor_oauth2_scheme), db: Asy
         raise cred_exc
 
     result = await db.execute(select(models.Doctor).where(models.Doctor.username == username))
-    doctor = result.scalar_one_or_none()
+    doctor = result.scalars().first()
     if doctor is None:
         raise cred_exc
     return doctor
@@ -118,7 +115,7 @@ async def _get_or_create_open_episode(db: AsyncSession, patient_id: int) -> mode
     if open_episodes:
         # If more than one open episode, lock all but the most recent
         for ep in open_episodes[1:]:
-            ep.locked = True
+            object.__setattr__(ep, 'locked', True)
             db.add(ep)
         if len(open_episodes) > 1:
             await db.commit()
@@ -153,20 +150,20 @@ async def _mirror_episode_to_patient(db: AsyncSession, patient: models.Patient, 
     await db.refresh(patient)
 
 async def _rotate_if_due(db: AsyncSession, patient: models.Patient) -> Optional[int]:
-    ep = await _get_or_create_open_episode(db, patient.id)
-    if ep.locked:
+    ep = await _get_or_create_open_episode(db, object.__getattribute__(patient, 'id'))
+    if getattr(ep, "locked", False):
         return None
-    if not ep.procedure_completed or not ep.procedure_date:
+    if not getattr(ep, "procedure_completed", False) or not getattr(ep, "procedure_date", None):
         return None
     if (date.today() - ep.procedure_date).days < 15:
         return None
 
-    ep.locked = True
+    object.__setattr__(ep, 'locked', True)
     db.add(ep)
     await db.commit()
 
     new_ep = models.TreatmentEpisode(
-        patient_id=patient.id,
+        patient_id=object.__getattribute__(patient, 'id'),
         department=None,
         doctor=None,
         treatment=None,
@@ -181,7 +178,7 @@ async def _rotate_if_due(db: AsyncSession, patient: models.Patient) -> Optional[
     await db.refresh(new_ep)
 
     await _mirror_episode_to_patient(db, patient, new_ep)
-    return new_ep.id
+    return object.__getattribute__(new_ep, 'id')
 
 @app.post("/signup", response_model=schemas.TokenResponse)
 async def signup(patient: schemas.PatientCreate, db: AsyncSession = Depends(get_db)):
@@ -189,30 +186,29 @@ async def signup(patient: schemas.PatientCreate, db: AsyncSession = Depends(get_
 
     # Check username
     res = await db.execute(select(models.Patient).where(models.Patient.username == patient.username))
-    if res.scalar_one_or_none():
+    if res.scalars().first():
         errors["username"] = "Username already exists"
 
     # Check email
     res = await db.execute(select(models.Patient).where(models.Patient.email == patient.email))
-    if res.scalar_one_or_none():
+    if res.scalars().first():
         errors["email"] = "Email already exists"
 
     # Check phone
     res = await db.execute(select(models.Patient).where(models.Patient.phone == patient.phone))
-    if res.scalar_one_or_none():
+    if res.scalars().first():
         errors["phone"] = "Phone number already exists"
 
     if errors:
         raise HTTPException(status_code=400, detail=errors)
 
-    # Continue with registration as before
     hashed_pw = get_password_hash(patient.password)
     db_patient = models.Patient(**patient.dict(exclude={"password"}), password=hashed_pw)
     db.add(db_patient)
     await db.commit()
     await db.refresh(db_patient)
 
-    ep = await _get_or_create_open_episode(db, db_patient.id)
+    ep = await _get_or_create_open_episode(db, object.__getattribute__(db_patient, 'id'))
     await _mirror_episode_to_patient(db, db_patient, ep)
 
     try:
@@ -226,7 +222,7 @@ async def signup(patient: schemas.PatientCreate, db: AsyncSession = Depends(get_
 @app.post("/login", response_model=schemas.TokenResponse)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.Patient).where(models.Patient.username == form_data.username))
-    user = result.scalar_one_or_none()
+    user = result.scalars().first()
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     access_token = create_access_token(data={"sub": user.username})
@@ -235,7 +231,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
 @app.post("/doctor-login", response_model=schemas.TokenResponse)
 async def doctor_login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.Doctor).where(models.Doctor.username == form_data.username))
-    doctor = result.scalar_one_or_none()
+    doctor = result.scalars().first()
     if not doctor or not verify_password(form_data.password, doctor.password):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     access_token = create_access_token(data={"sub": doctor.username})
@@ -315,11 +311,11 @@ async def list_instruction_status(date_from: Optional[date] = None, date_to: Opt
 @app.post("/department-doctor")
 async def save_department_doctor(data: schemas.DepartmentDoctorSelection, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     await _rotate_if_due(db, current_user)
-    ep = await _get_or_create_open_episode(db, current_user.id)
-    if ep.locked:
+    ep = await _get_or_create_open_episode(db, object.__getattribute__(current_user, 'id'))
+    if getattr(ep, "locked", False):
         raise HTTPException(status_code=423, detail="Episode is locked and cannot be modified.")
-    ep.department = data.department
-    ep.doctor = data.doctor
+    object.__setattr__(ep, 'department', data.department)
+    object.__setattr__(ep, 'doctor', data.doctor)
     db.add(ep)
     await db.commit()
     await db.refresh(ep)
@@ -329,17 +325,17 @@ async def save_department_doctor(data: schemas.DepartmentDoctorSelection, db: As
 @app.post("/treatment-info", response_model=schemas.PatientPublic)
 async def save_treatment_info(info: schemas.TreatmentInfoCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.Patient).where(models.Patient.username == info.username))
-    patient = result.scalar_one_or_none()
+    patient = result.scalars().first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     await _rotate_if_due(db, patient)
-    ep = await _get_or_create_open_episode(db, patient.id)
-    if ep.locked:
+    ep = await _get_or_create_open_episode(db, object.__getattribute__(patient, 'id'))
+    if getattr(ep, "locked", False):
         raise HTTPException(status_code=423, detail="Episode is locked and cannot be modified.")
-    ep.treatment = info.treatment
-    ep.subtype = info.subtype
-    ep.procedure_date = info.procedure_date
-    ep.procedure_time = info.procedure_time
+    object.__setattr__(ep, 'treatment', info.treatment)
+    object.__setattr__(ep, 'subtype', info.subtype)
+    object.__setattr__(ep, 'procedure_date', info.procedure_date)
+    object.__setattr__(ep, 'procedure_time', info.procedure_time)
     db.add(ep)
     await db.commit()
     await db.refresh(ep)
@@ -349,26 +345,26 @@ async def save_treatment_info(info: schemas.TreatmentInfoCreate, db: AsyncSessio
 @app.get("/episodes/current", response_model=schemas.CurrentEpisodeResponse)
 async def get_current_episode(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
     await _rotate_if_due(db, current_user)
-    ep = await _get_or_create_open_episode(db, current_user.id)
+    ep = await _get_or_create_open_episode(db, object.__getattribute__(current_user, 'id'))
     return schemas.CurrentEpisodeResponse.model_validate(ep, from_attributes=True)
 
 @app.get("/episodes/history", response_model=List[schemas.EpisodeResponse])
 async def get_episode_history(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
-    stmt = select(models.TreatmentEpisode).where(models.TreatmentEpisode.patient_id == current_user.id).order_by(models.TreatmentEpisode.id.desc())
+    stmt = select(models.TreatmentEpisode).where(models.TreatmentEpisode.patient_id == object.__getattribute__(current_user, 'id')).order_by(models.TreatmentEpisode.id.desc())
     res = await db.execute(stmt)
     episodes = res.scalars().all()
     return [schemas.EpisodeResponse.model_validate(e, from_attributes=True) for e in episodes]
 
 @app.post("/episodes/mark-complete", response_model=schemas.EpisodeResponse)
 async def mark_episode_complete(payload: schemas.MarkCompleteRequest, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
-    ep = await _get_or_create_open_episode(db, current_user.id)
-    if ep.locked:
+    ep = await _get_or_create_open_episode(db, object.__getattribute__(current_user, 'id'))
+    if getattr(ep, "locked", False):
         raise HTTPException(status_code=423, detail="Episode is locked and cannot be modified.")
-    ep.procedure_completed = bool(payload.procedure_completed)
+    object.__setattr__(ep, 'procedure_completed', bool(payload.procedure_completed))
     if payload.procedure_date is not None:
-        ep.procedure_date = payload.procedure_date
+        object.__setattr__(ep, 'procedure_date', payload.procedure_date)
     if payload.procedure_time is not None:
-        ep.procedure_time = payload.procedure_time
+        object.__setattr__(ep, 'procedure_time', payload.procedure_time)
     db.add(ep)
     await db.commit()
     await db.refresh(ep)

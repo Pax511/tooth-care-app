@@ -9,11 +9,19 @@ import os
 
 
 def send_registration_email(to_email, user_name):
+
     EMAIL_HOST = os.getenv("EMAIL_HOST")
-    EMAIL_PORT = int(os.getenv("EMAIL_PORT"))
+    EMAIL_PORT_RAW = os.getenv("EMAIL_PORT")
     EMAIL_USER = os.getenv("EMAIL_USER")
     EMAIL_PASS = os.getenv("EMAIL_PASS")
     EMAIL_FROM = os.getenv("EMAIL_FROM")
+
+    if not EMAIL_HOST or not EMAIL_PORT_RAW or not EMAIL_USER or not EMAIL_PASS or not EMAIL_FROM:
+        raise EnvironmentError("Missing one or more required email environment variables: EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, EMAIL_FROM")
+    try:
+        EMAIL_PORT = int(EMAIL_PORT_RAW)
+    except Exception:
+        raise ValueError("EMAIL_PORT environment variable must be an integer.")
 
     subject = "Welcome to MGM Hospital App!"
     body = (
@@ -23,15 +31,15 @@ def send_registration_email(to_email, user_name):
     )
 
     msg = MIMEMultipart()
-    msg["From"] = EMAIL_FROM
+    msg["From"] = str(EMAIL_FROM)
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
 
     try:
         with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT) as server:
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.sendmail(EMAIL_FROM, to_email, msg.as_string())
+            server.login(str(EMAIL_USER), str(EMAIL_PASS))
+            server.sendmail(str(EMAIL_FROM), to_email, msg.as_string())
         print(f"Registration email sent to {to_email}")
         return True
     except Exception as e:
@@ -71,7 +79,8 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def create_access_token(data: dict, expires_delta: timedelta = None):
+from typing import Optional
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})

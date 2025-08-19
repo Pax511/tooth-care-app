@@ -37,6 +37,8 @@ class Patient(Base):
         self.password = pwd_context.hash(raw_password)
 
     def verify_password(self, raw_password):
+        if not isinstance(self.password, str):
+            raise ValueError("Password attribute is not loaded or not a string.")
         return pwd_context.verify(raw_password, self.password)
 
 class TreatmentEpisode(Base):
@@ -68,6 +70,8 @@ class Doctor(Base):
         self.password = pwd_context.hash(raw_password)
 
     def verify_password(self, raw_password):
+        if not isinstance(self.password, str):
+            raise ValueError("Password attribute is not loaded or not a string.")
         return pwd_context.verify(raw_password, self.password)
 
 class Appointment(Base):
