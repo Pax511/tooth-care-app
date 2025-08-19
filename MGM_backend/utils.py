@@ -8,21 +8,11 @@ import os
 
 
 
+
+import requests
+
 def send_registration_email(to_email, user_name):
-
-    EMAIL_HOST = os.getenv("EMAIL_HOST")
-    EMAIL_PORT_RAW = os.getenv("EMAIL_PORT")
-    EMAIL_USER = os.getenv("EMAIL_USER")
-    EMAIL_PASS = os.getenv("EMAIL_PASS")
-    EMAIL_FROM = os.getenv("EMAIL_FROM")
-
-    if not EMAIL_HOST or not EMAIL_PORT_RAW or not EMAIL_USER or not EMAIL_PASS or not EMAIL_FROM:
-        raise EnvironmentError("Missing one or more required email environment variables: EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, EMAIL_FROM")
-    try:
-        EMAIL_PORT = int(EMAIL_PORT_RAW)
-    except Exception:
-        raise ValueError("EMAIL_PORT environment variable must be an integer.")
-
+    EMAIL_MODE = os.getenv("EMAIL_MODE", "smtp")
     subject = "Welcome to MGM Hospital App!"
     body = (
         f"Hello {user_name},\n\n"
@@ -30,21 +20,59 @@ def send_registration_email(to_email, user_name):
         "Thank you!"
     )
 
-    msg = MIMEMultipart()
-    msg["From"] = str(EMAIL_FROM)
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
+    if EMAIL_MODE == "mailtrap_api":
+        MAILTRAP_TOKEN = os.getenv("https://sandbox.api.mailtrap.io/api/send/3975049")
+        EMAIL_FROM = os.getenv("EMAIL_FROM", "your@email.com")
+        if not MAILTRAP_TOKEN:
+            print("MAILTRAP_API_TOKEN not set!")
+            return False
+        url = "https://send.api.mailtrap.io/api/send"
+        headers = {
+            "Authorization": f"Bearer {MAILTRAP_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "from": {"email": EMAIL_FROM},
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "text": body
+        }
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code == 200:
+            print(f"Registration email sent to {to_email} via Mailtrap API")
+            return True
+        else:
+            print(f"Could not send email via Mailtrap API: {response.text}")
+            return False
+    else:
+        EMAIL_HOST = os.getenv("EMAIL_HOST")
+        EMAIL_PORT_RAW = os.getenv("EMAIL_PORT")
+        EMAIL_USER = os.getenv("EMAIL_USER")
+        EMAIL_PASS = os.getenv("EMAIL_PASS")
+        EMAIL_FROM = os.getenv("EMAIL_FROM")
 
-    try:
-        with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT) as server:
-            server.login(str(EMAIL_USER), str(EMAIL_PASS))
-            server.sendmail(str(EMAIL_FROM), to_email, msg.as_string())
-        print(f"Registration email sent to {to_email}")
-        return True
-    except Exception as e:
-        print(f"Could not send email: {e}")
-        return False
+        if not EMAIL_HOST or not EMAIL_PORT_RAW or not EMAIL_USER or not EMAIL_PASS or not EMAIL_FROM:
+            raise EnvironmentError("Missing one or more required email environment variables: EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, EMAIL_FROM")
+        try:
+            EMAIL_PORT = int(EMAIL_PORT_RAW)
+        except Exception:
+            raise ValueError("EMAIL_PORT environment variable must be an integer.")
+
+        msg = MIMEMultipart()
+        msg["From"] = str(EMAIL_FROM)
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        try:
+            with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT) as server:
+                server.login(str(EMAIL_USER), str(EMAIL_PASS))
+                server.sendmail(str(EMAIL_FROM), to_email, msg.as_string())
+            print(f"Registration email sent to {to_email}")
+            return True
+        except Exception as e:
+            print(f"Could not send email: {e}")
+            return False
 
 
 def send_email(to_email, subject, body):
