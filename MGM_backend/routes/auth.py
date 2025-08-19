@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 import random
 from typing import Optional
-from models import User  # Adjust import if needed
+from models import Patient, Doctor # Adjust import if needed
 from database import get_db  # Adjust import if needed
 from sqlalchemy.orm import Session
 
@@ -30,7 +30,7 @@ def request_reset(data: RequestResetSchema, db: Session = Depends(get_db)):
     # Find user by email or phone
     user = None
     if data.email:
-        user = db.query(User).filter(User.email == data.email).first()
+        user = db.query(Patient).filter(Patient.email == data.email).first()
     else:
         user = db.query(User).filter(User.phone == data.phone).first()
     if not user:
@@ -63,7 +63,7 @@ def verify_otp(data: VerifyOtpSchema, db: Session = Depends(get_db)):
     # Find user
     user = None
     if data.email:
-        user = db.query(User).filter(User.email == data.email).first()
+        user = db.query(Patient).filter(Patient.email == data.email).first()
     else:
         user = db.query(User).filter(User.phone == data.phone).first()
     if not user:
