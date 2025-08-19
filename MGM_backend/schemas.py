@@ -78,6 +78,7 @@ class PatientPublic(BaseModel):
 class DoctorBase(BaseModel):
     name: str
     specialty: str
+    email: EmailStr
 
 class DoctorCreate(DoctorBase):
     username: str

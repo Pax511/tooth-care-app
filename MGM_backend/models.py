@@ -63,6 +63,7 @@ class Doctor(Base):
     specialty = Column(String, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False)
     appointments = relationship("Appointment", back_populates="doctor", cascade="all, delete-orphan")
     doctor_feedbacks = relationship("DoctorFeedback", back_populates="doctor", cascade="all, delete-orphan")
 
