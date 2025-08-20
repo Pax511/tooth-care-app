@@ -77,21 +77,53 @@ def send_registration_email(to_email, user_name):
 
 
 def send_email(to_email, subject, body):
-    # Replace with your SMTP settings
-    smtp_server = "smtp.example.com"
-    smtp_port = 587
-    smtp_user = "your@email.com"
-    smtp_password = "yourpassword"
+    EMAIL_MODE = os.getenv("EMAIL_MODE", "smtp")
+    print(f"[DEBUG] EMAIL_MODE in send_email: {EMAIL_MODE}")
+    if EMAIL_MODE == "mailtrap_api":
+        MAILTRAP_TOKEN = os.getenv("MAILTRAP_API_TOKEN")
+        EMAIL_FROM = os.getenv("EMAIL_FROM", "your@email.com")
+        if not MAILTRAP_TOKEN:
+            print("MAILTRAP_API_TOKEN not set!")
+            return False
+        url = "https://send.api.mailtrap.io/api/send"
+        headers = {
+            "Authorization": f"Bearer {MAILTRAP_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "from": {"email": EMAIL_FROM},
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "text": body
+        }
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code == 200:
+            print(f"Email sent to {to_email} via Mailtrap API")
+            return True
+        else:
+            print(f"Could not send email via Mailtrap API: {response.text}")
+            return False
+    else:
+        smtp_server = os.getenv("EMAIL_HOST")
+        smtp_port = int(os.getenv("EMAIL_PORT", 587))
+        smtp_user = os.getenv("EMAIL_USER")
+        smtp_password = os.getenv("EMAIL_PASS")
+        EMAIL_FROM = os.getenv("EMAIL_FROM")
 
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = smtp_user
-    msg["To"] = to_email
+        if not smtp_server:
+            raise EnvironmentError("EMAIL_HOST environment variable must be set.")
+        if not smtp_user or not smtp_password:
+            raise EnvironmentError("EMAIL_USER and EMAIL_PASS environment variables must be set.")
 
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, [to_email], msg.as_string())
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = smtp_user
+        msg["To"] = to_email
+
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_user, [to_email], msg.as_string())
 
 
         
