@@ -1,18 +1,19 @@
+
+import os
+EMAIL_MODE = os.getenv("EMAIL_MODE", "smtp")
+print(f"[DEBUG] EMAIL_MODE at startup: {EMAIL_MODE}")
+
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import os
-
-
-
-
 import requests
 
 def send_registration_email(to_email, user_name):
     EMAIL_MODE = os.getenv("EMAIL_MODE", "smtp")
+    print(f"[DEBUG] EMAIL_MODE: {EMAIL_MODE}")
     subject = "Welcome to MGM Hospital App!"
     body = (
         f"Hello {user_name},\n\n"
@@ -21,7 +22,7 @@ def send_registration_email(to_email, user_name):
     )
 
     if EMAIL_MODE == "mailtrap_api":
-        MAILTRAP_TOKEN = os.getenv("https://sandbox.api.mailtrap.io/api/send/3975049")
+        MAILTRAP_TOKEN = os.getenv("MAILTRAP_API_TOKEN")
         EMAIL_FROM = os.getenv("EMAIL_FROM", "your@email.com")
         if not MAILTRAP_TOKEN:
             print("MAILTRAP_API_TOKEN not set!")
