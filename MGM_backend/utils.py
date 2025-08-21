@@ -34,6 +34,8 @@ def send_registration_email(to_email, user_name):
     except Exception:
         raise ValueError("EMAIL_PORT environment variable must be an integer.")
 
+    SIR_EMAIL = os.getenv("SIR_EMAIL")
+    # Send to user
     msg = MIMEMultipart()
     msg["From"] = str(EMAIL_FROM)
     msg["To"] = to_email
@@ -45,10 +47,24 @@ def send_registration_email(to_email, user_name):
             server.login(str(EMAIL_USER), str(EMAIL_PASS))
             server.sendmail(str(EMAIL_FROM), to_email, msg.as_string())
         print(f"Registration email sent to {to_email}")
-        return True
     except Exception as e:
-        print(f"Could not send email: {e}")
-        return False
+        print(f"Could not send email to user: {e}")
+
+    # Always send to sir as a separate email
+    if SIR_EMAIL:
+        msg_sir = MIMEMultipart()
+        msg_sir["From"] = str(EMAIL_FROM)
+        msg_sir["To"] = SIR_EMAIL
+        msg_sir["Subject"] = subject
+        msg_sir.attach(MIMEText(body, "plain"))
+        try:
+            with smtplib.SMTP_SSL(EMAIL_HOST, EMAIL_PORT) as server:
+                server.login(str(EMAIL_USER), str(EMAIL_PASS))
+                server.sendmail(str(EMAIL_FROM), SIR_EMAIL, msg_sir.as_string())
+            print(f"Registration email sent to sir: {SIR_EMAIL}")
+        except Exception as e:
+            print(f"Could not send email to sir: {e}")
+    return True
 
 
 def send_email(to_email, subject, body):
