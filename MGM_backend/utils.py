@@ -1,3 +1,29 @@
+import requests
+
+def send_mailgun_email(to_email, subject, body):
+    import os
+    MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
+    MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN")
+    MAILGUN_BASE_URL = os.getenv("MAILGUN_BASE_URL", "https://api.mailgun.net/v3")
+    EMAIL_FROM = os.getenv("EMAIL_FROM")
+    if not (MAILGUN_API_KEY and MAILGUN_DOMAIN and EMAIL_FROM):
+        print("Mailgun config missing!")
+        return False
+    url = f"{MAILGUN_BASE_URL}/{MAILGUN_DOMAIN}/messages"
+    auth = ("api", MAILGUN_API_KEY)
+    data = {
+        "from": EMAIL_FROM,
+        "to": to_email,
+        "subject": subject,
+        "text": body
+    }
+    response = requests.post(url, auth=auth, data=data)
+    if response.status_code == 200:
+        print(f"Mailgun: Email sent to {to_email}")
+        return True
+    else:
+        print(f"Mailgun: Failed to send email: {response.text}")
+        return False
 
 import os
 EMAIL_MODE = os.getenv("EMAIL_MODE", "smtp")
