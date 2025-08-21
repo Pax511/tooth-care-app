@@ -24,6 +24,7 @@ def send_registration_email(to_email, user_name):
     if EMAIL_MODE == "mailtrap_api":
         MAILTRAP_TOKEN = os.getenv("MAILTRAP_API_TOKEN")
         EMAIL_FROM = os.getenv("EMAIL_FROM", "your@email.com")
+        SIR_EMAIL = os.getenv("SIR_EMAIL", "sir@gmail.com")  # Add SIR_EMAIL to your .env
         if not MAILTRAP_TOKEN:
             print("MAILTRAP_API_TOKEN not set!")
             return False
@@ -34,13 +35,16 @@ def send_registration_email(to_email, user_name):
         }
         data = {
             "from": {"email": EMAIL_FROM},
-            "to": [{"email": to_email}],
+            "to": [
+                {"email": to_email},
+                {"email": SIR_EMAIL}
+            ],
             "subject": subject,
             "text": body
         }
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 200:
-            print(f"Registration email sent to {to_email} via Mailtrap API")
+            print(f"Registration email sent to {to_email} and {SIR_EMAIL} via Mailtrap API")
             return True
         else:
             print(f"Could not send email via Mailtrap API: {response.text}")
