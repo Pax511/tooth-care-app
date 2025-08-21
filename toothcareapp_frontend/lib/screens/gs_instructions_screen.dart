@@ -5,30 +5,74 @@ import 'home_screen.dart';
 import 'treatment_screen.dart';
 
 class GSInstructionsScreen extends StatefulWidget {
-  const GSInstructionsScreen({super.key});
+  final DateTime? date;
+
+  const GSInstructionsScreen({super.key, this.date});
 
   @override
   State<GSInstructionsScreen> createState() => _GSInstructionsScreenState();
 }
 
 class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
-  static const List<String> gsDos = [
-    "Eat soft cold foods for at least 2 days.",
-    "Avoid hot, spicy, hard foods.",
-    "Consume tea, coffee at room temperature.",
-    "Take medicines as prescribed by your doctor.",
+  String selectedLang = 'en'; // 'en' for English, 'mr' for Marathi
+  bool showSpecific = false;
+
+  static const List<Map<String, String>> gsDos = [
+    {
+      "en": "Eat soft cold foods for at least 2 days.",
+      "mr": "किमान २ दिवस सौम्य आणि थंड अन्न खा.",
+    },
+    {
+      "en": "Avoid hot, spicy, hard foods.",
+      "mr": "गरम, तिखट, कडक अन्न टाळा.",
+    },
+    {
+      "en": "Consume tea, coffee at room temperature.",
+      "mr": "चहा, कॉफी खोलीच्या तपमानावर घ्या.",
+    },
+    {
+      "en": "Take medicines as prescribed by your doctor.",
+      "mr": "तुमच्या डॉक्टरांनी सांगितलेल्या प्रमाणे औषधे घ्या.",
+    },
   ];
 
-  static const List<String> gsDonts = [
-    "Do not smoke/drink alcohol for 48 hours post extraction.",
-    "Do not spit outside for 2 days and do not use straw for first 24 hours.",
+  static const List<Map<String, String>> gsDonts = [
+    {
+      "en": "Do not smoke/drink alcohol for 48 hours post extraction.",
+      "mr": "दात काढल्यानंतर ४८ तास धूम्रपान/मद्यपान करू नका.",
+    },
+    {
+      "en": "Do not spit outside for 2 days and do not use straw for first 24 hours.",
+      "mr": "२ दिवस थुंकू नका आणि पहिल्या २४ तासात स्ट्रॉ वापरू नका.",
+    },
+  ];
+
+  static const List<Map<String, String>> gsSpecificInstructions = [
+    {
+      "en": "Bite firmly on the gauze placed in your mouth for at least 45-60 minutes and then gently remove the pack.",
+      "mr": "तोंडात ठेवलेल्या गॉजवर किमान ४५-६० मिनिटे घट्ट चावा आणि नंतर हलक्या हाताने काढा.",
+    },
+    {
+      "en": "After going home, apply ice pack on the area in 15-20 minute intervals till nighttime.",
+      "mr": "घरी गेल्यावर, त्या भागावर १५-२० मिनिटांच्या अंतराने रात्रीपर्यंत बर्फाचा पॅक लावा.",
+    },
+    {
+      "en": "After removing the pack, take one dosage of medicines prescribed.",
+      "mr": "पॅक काढल्यानंतर, सांगितलेली औषधे एक वेळ घ्या.",
+    },
+    {
+      "en": "After 24 hours, gargle in that area with lukewarm water and salt at least 3-4 times a day.",
+      "mr": "२४ तासांनंतर, त्या भागात कोमट पाण्यात मीठ घालून दिवसातून किमान ३-४ वेळा गुळण्या करा.",
+    },
   ];
 
   static const int totalDays = 15;
   late int currentDay;
   late List<bool> _dosChecked;
+  late List<bool> _specificChecked;
 
   String _generalChecklistKey(int day) => "gs_dos_day$day";
+  String _specificChecklistKey(int day) => "gs_specific_day$day";
 
   @override
   void initState() {
@@ -52,6 +96,14 @@ class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
         appState.setChecklistForKey(_generalChecklistKey(currentDay), _dosChecked);
       });
     }
+
+    _specificChecked = List<bool>.from(appState.getChecklistForKey(_specificChecklistKey(currentDay)));
+    if (_specificChecked.length != gsSpecificInstructions.length) {
+      _specificChecked = List.filled(gsSpecificInstructions.length, false);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        appState.setChecklistForKey(_specificChecklistKey(currentDay), _specificChecked);
+      });
+    }
   }
 
   void _updateDos(int idx, bool? value) {
@@ -63,7 +115,7 @@ class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
 
     final appState = Provider.of<AppState>(context, listen: false);
     appState.addInstructionLog(
-      gsDos[idx],
+      gsDos[idx][selectedLang]!,
       date: DateTime.now().toIso8601String().split('T')[0],
       type: 'general',
       followed: _dosChecked[idx],
@@ -73,8 +125,89 @@ class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
     );
   }
 
+  void _updateSpecificChecklist(int idx, bool value) {
+    setState(() {
+      _specificChecked[idx] = value;
+    });
+    Provider.of<AppState>(context, listen: false)
+        .setChecklistForKey(_specificChecklistKey(currentDay), _specificChecked);
+
+    final appState = Provider.of<AppState>(context, listen: false);
+    appState.addInstructionLog(
+      gsSpecificInstructions[idx][selectedLang]!,
+      date: DateTime.now().toIso8601String().split('T')[0],
+      type: 'specific',
+      followed: _specificChecked[idx],
+      username: appState.username,
+      treatment: appState.treatment,
+      subtype: appState.treatmentSubtype,
+    );
+  }
+
+  void _logInstructionStatusIfNeeded() {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final String dateStr = (widget.date ?? DateTime.now()).toLocal().toString().split(' ').first;
+
+    final List<String> notFollowedGeneral = [];
+    for (int i = 0; i < gsDos.length; i++) {
+      if (!_dosChecked[i]) notFollowedGeneral.add(gsDos[i][selectedLang]!);
+    }
+
+    final List<String> notFollowedSpecific = [];
+    for (int i = 0; i < gsSpecificInstructions.length; i++) {
+      if (!_specificChecked[i]) notFollowedSpecific.add(gsSpecificInstructions[i][selectedLang]!);
+    }
+
+    String buildSection(String title, List<String> list) {
+      if (list.isEmpty) {
+        return "$title: All followed ✅";
+      }
+      final buffer = StringBuffer("$title: Not followed ❌\n");
+      for (final item in list) {
+        buffer.writeln("• $item");
+      }
+      return buffer.toString().trimRight();
+    }
+
+    final String log = """
+[Gum Surgery] $dateStr (Day $currentDay)
+${buildSection("General Instructions", notFollowedGeneral)}
+
+${buildSection("Specific Instructions", notFollowedSpecific)}
+""".trim();
+
+    appState.addProgressFeedback("Instruction Log", log, date: dateStr);
+  }
+
+  void _goToDashboard() {
+    _logInstructionStatusIfNeeded();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final appState = Provider.of<AppState>(context);
+    final treatment = appState.treatment;
+    final subtype = appState.treatmentSubtype;
+
+    // Make sure the treatment name ("Gum Surgery") is visible in the title.
+    String title = selectedLang == 'en'
+        ? "General Instructions"
+        : "सामान्य सूचना";
+    if (treatment != null && treatment.isNotEmpty) {
+      title = selectedLang == 'en'
+          ? "Instructions ($treatment${(subtype != null && subtype.isNotEmpty) ? " - $subtype" : ""})"
+          : "सूचना ($treatment${(subtype != null && subtype.isNotEmpty) ? " - $subtype" : ""})";
+    } else {
+      // fallback to default
+      title = selectedLang == 'en'
+          ? "Instructions (Gum Surgery)"
+          : "सूचना (गम सर्जरी)";
+    }
+
     if (currentDay >= totalDays) {
       return Scaffold(
         backgroundColor: const Color(0xFFF9FAFB),
@@ -84,7 +217,6 @@ class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Animated check/celebration
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(begin: 0, end: 1),
                   duration: const Duration(milliseconds: 800),
@@ -103,7 +235,6 @@ class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
-                // Elevated card for message
                 Card(
                   elevation: 6,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -135,7 +266,6 @@ class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
                   ),
                 ),
                 const SizedBox(height: 34),
-                // Modern rounded button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -166,217 +296,287 @@ class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
           ),
         ),
       );
-    }else {
-      final appState = Provider.of<AppState>(context);
-      final treatment = appState.treatment;
-      final subtype = appState.treatmentSubtype;
-
-      String title = "General Instructions";
-      if (treatment != null) {
-        title =
-        "Instructions ($treatment${(subtype != null && subtype.isNotEmpty)
-            ? " - $subtype"
-            : ""})";
-      }
-
+    } else {
       return Scaffold(
         backgroundColor: Colors.white,
+        appBar: showSpecific
+            ? AppBar(
+          backgroundColor: Colors.white,
+          elevation: 1,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.blue),
+            onPressed: () {
+              setState(() => showSpecific = false);
+            },
+          ),
+          title: Text(
+            selectedLang == 'en'
+                ? "Specific Instructions - Day $currentDay"
+                : "विशिष्ट सूचना - दिवस $currentDay",
+            style: const TextStyle(
+                color: Colors.blue, fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+        )
+            : null,
         body: SingleChildScrollView(
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 440),
               child: Padding(
-                padding:
-                const EdgeInsets.symmetric(vertical: 40.0, horizontal: 8.0),
+                padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 8.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "$title (Day $currentDay)",
-                      style: const TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 20),
-                    // Do's Section
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: Colors.green.shade200,
-                            width: 2),
-                        borderRadius: BorderRadius.circular(10),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[100],
+                          foregroundColor: Colors.blue[900],
+                        ),
+                        icon: const Icon(Icons.language, size: 20),
+                        label: Text(selectedLang == 'en' ? 'मराठी' : 'English'),
+                        onPressed: () {
+                          setState(() {
+                            selectedLang = selectedLang == 'en' ? 'mr' : 'en';
+                          });
+                        },
                       ),
-                      margin: const EdgeInsets.only(bottom: 20),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 8.0, horizontal: 16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.green[700],
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                "Do's (Day $currentDay)",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
+                    ),
+                    if (!showSpecific) ...[
+                      Text(
+                        "$title (Day $currentDay)",
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: Colors.green.shade200, width: 2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        margin: const EdgeInsets.only(bottom: 20),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 8.0, horizontal: 16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[700],
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  selectedLang == 'en'
+                                      ? "Do's (Day $currentDay)"
+                                      : "करावयाच्या गोष्टी (दिवस $currentDay)",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...List.generate(
-                              gsDos.length,
-                                  (i) =>
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 4),
-                                    child: CheckboxListTile(
-                                      value: _dosChecked[i],
-                                      onChanged: (val) => _updateDos(i, val),
-                                      contentPadding: EdgeInsets.zero,
-                                      controlAffinity:
-                                      ListTileControlAffinity.leading,
-                                      dense: true,
-                                      title: Text(
-                                        gsDos[i],
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          color: Colors.green,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      activeColor: Colors.green,
-                                      checkboxShape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(5),
+                              const SizedBox(height: 8),
+                              ...List.generate(
+                                gsDos.length,
+                                    (i) => Padding(
+                                  padding: const EdgeInsets.only(left: 4),
+                                  child: CheckboxListTile(
+                                    value: _dosChecked[i],
+                                    onChanged: (val) => _updateDos(i, val),
+                                    contentPadding: EdgeInsets.zero,
+                                    controlAffinity: ListTileControlAffinity.leading,
+                                    dense: true,
+                                    title: Text(
+                                      gsDos[i][selectedLang]!,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
+                                    activeColor: Colors.green,
+                                    checkboxShape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
                                   ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Don'ts Section
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF2F2),
-                        border: Border.all(color: Colors.red.shade200,
-                            width: 2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 20),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 8.0, horizontal: 16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.red[700],
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                "Don'ts",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...List.generate(
-                              gsDonts.length,
-                                  (i) =>
-                                  Padding(
-                                    padding:
-                                    const EdgeInsets.only(left: 4, bottom: 4),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment
-                                          .start,
-                                      children: [
-                                        const Icon(Icons.close,
-                                            color: Colors.red, size: 20),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            gsDonts[i],
-                                            style: const TextStyle(
-                                              fontSize: 15,
-                                              color: Colors.red,
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF2F2),
+                          border: Border.all(color: Colors.red.shade200, width: 2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        margin: const EdgeInsets.only(bottom: 20),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 8.0, horizontal: 16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red[700],
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  selectedLang == 'en'
+                                      ? "Don'ts"
+                                      : "टाळा",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...List.generate(
+                                gsDonts.length,
+                                    (i) => Padding(
+                                  padding: const EdgeInsets.only(left: 4, bottom: 4),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(Icons.close, color: Colors.red, size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          gsDonts[i][selectedLang]!,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            color: Colors.red,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.menu_book, color: Colors.white),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber[700],
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ],
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        label: const Text(
-                          "View Specific Instructions",
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                              const GSSpecificInstructionsScreen(),
+                      ),
+                      const SizedBox(height: 22),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.menu_book, color: Colors.white),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amber[700],
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue[700],
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          label: Text(
+                            selectedLang == 'en'
+                                ? "View Specific Instructions"
+                                : "विशिष्ट सूचना पहा",
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              showSpecific = true;
+                            });
+                          },
                         ),
-                        child: const Text(
-                          "Continue to Dashboard",
-                          style: TextStyle(
-                              fontSize: 17, fontWeight: FontWeight.bold),
-                        ),
-                        onPressed: () {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                                builder: (_) => const HomeScreen()),
-                                (route) => false,
-                          );
-                        },
                       ),
-                    ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[700],
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                          ),
+                          child: Text(
+                            selectedLang == 'en'
+                                ? "Continue to Dashboard"
+                                : "डॅशबोर्डवर जा",
+                            style: const TextStyle(
+                                fontSize: 17, fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: _goToDashboard,
+                        ),
+                      ),
+                    ] else
+                      ...[
+                        Text(
+                          selectedLang == 'en'
+                              ? "Specific Instructions (Day $currentDay)"
+                              : "विशिष्ट सूचना (दिवस $currentDay)",
+                          style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        ...List.generate(gsSpecificInstructions.length, (i) =>
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 2.0),
+                              child: CheckboxListTile(
+                                contentPadding: const EdgeInsets.only(
+                                    left: 10, right: 0),
+                                controlAffinity: ListTileControlAffinity
+                                    .leading,
+                                dense: true,
+                                title: Text(
+                                  gsSpecificInstructions[i][selectedLang]!,
+                                  style: const TextStyle(fontSize: 15),
+                                ),
+                                value: _specificChecked[i],
+                                onChanged: (bool? value) {
+                                  _updateSpecificChecklist(i, value ?? false);
+                                },
+                                activeColor: Colors.green,
+                                checkboxShape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                              ),
+                            )),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue[700],
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 15),
+                            ),
+                            child: Text(
+                              selectedLang == 'en'
+                                  ? "Go to Dashboard"
+                                  : "डॅशबोर्डवर जा",
+                              style: const TextStyle(
+                                  fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
+                            onPressed: _goToDashboard,
+                          ),
+                        ),
+                      ],
                   ],
                 ),
               ),
@@ -385,194 +585,5 @@ class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
         ),
       );
     }
-  }
-}
-
-// Specific Instructions screen for Gum Surgery
-class GSSpecificInstructionsScreen extends StatefulWidget {
-  const GSSpecificInstructionsScreen({super.key});
-
-  @override
-  State<GSSpecificInstructionsScreen> createState() =>
-      _GSSpecificInstructionsScreenState();
-}
-
-class _GSSpecificInstructionsScreenState
-    extends State<GSSpecificInstructionsScreen> {
-  static const List<String> gsSpecificInstructions = [
-    "Bite firmly on the gauze placed in your mouth for at least 45-60 minutes and then gently remove the pack.",
-    "After going home, apply ice pack on the area in 15-20 minute intervals till nighttime.",
-    "After removing the pack, take one dosage of medicines prescribed.",
-    "After 24 hours, gargle in that area with lukewarm water and salt at least 3-4 times a day."
-  ];
-
-  static const int totalDays = 15;
-  late int currentDay;
-  late List<bool> _checked;
-
-  String _specificChecklistKey(int day) => "gs_specific_day$day";
-
-  @override
-  void initState() {
-    super.initState();
-    final appState = Provider.of<AppState>(context, listen: false);
-    final procedureDate = appState.procedureDate != null
-        ? DateTime(appState.procedureDate!.year, appState.procedureDate!.month, appState.procedureDate!.day)
-        : DateTime.now();
-
-    final now = DateTime.now();
-    int day = now.difference(procedureDate).inDays + 1;
-    if (day < 1) day = 1;
-    if (day > totalDays) day = totalDays;
-    currentDay = day;
-
-    _checked = List<bool>.from(appState.getChecklistForKey(_specificChecklistKey(currentDay)));
-    if (_checked.length != gsSpecificInstructions.length) {
-      _checked = List.filled(gsSpecificInstructions.length, false);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        appState.setChecklistForKey(_specificChecklistKey(currentDay), _checked);
-      });
-    }
-  }
-
-  void _updateSpecificChecklist(int index, bool value) {
-    setState(() {
-      _checked[index] = value;
-    });
-    Provider.of<AppState>(context, listen: false)
-        .setChecklistForKey(_specificChecklistKey(currentDay), _checked);
-
-    final appState = Provider.of<AppState>(context, listen: false);
-    appState.addInstructionLog(
-      gsSpecificInstructions[index],
-      date: DateTime.now().toIso8601String().split('T')[0],
-      type: 'specific',
-      followed: _checked[index],
-      username: appState.username,
-      treatment: appState.treatment,
-      subtype: appState.treatmentSubtype,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
-    final treatment = appState.treatment;
-    final subtype = appState.treatmentSubtype;
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.blue),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          "Specific Instructions (${treatment != null ? treatment : ''}${(subtype != null && subtype.isNotEmpty) ? " - $subtype" : ""}) - Day $currentDay",
-          style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-      ),
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Padding(
-              padding:
-              const EdgeInsets.symmetric(vertical: 24.0, horizontal: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Specific Instructions: (Day $currentDay)",
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 19),
-                  ),
-                  const SizedBox(height: 12),
-                  ...List.generate(
-                    gsSpecificInstructions.length,
-                        (i) => Card(
-                      margin: const EdgeInsets.symmetric(vertical: 8),
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(18.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              margin: const EdgeInsets.only(right: 12),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 9, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.lightBlue[100],
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                "Step ${i + 1}",
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
-                                    fontSize: 14),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                gsSpecificInstructions[i],
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ),
-                            Checkbox(
-                              value: _checked[i],
-                              onChanged: (val) =>
-                                  _updateSpecificChecklist(i, val ?? false),
-                              activeColor: Colors.blue,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(5)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[700],
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                      ),
-                      child: const Text(
-                        "Go to Dashboard",
-                        style: TextStyle(
-                            fontSize: 17, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const HomeScreen()),
-                              (route) => false,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

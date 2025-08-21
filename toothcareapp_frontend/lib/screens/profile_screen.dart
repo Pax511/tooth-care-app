@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../services/api_service.dart';
 import 'welcome_screen.dart'; // <-- Adjust this path if needed!
+import '../auth_callbacks.dart';
 import 'calendar_screen.dart';
+
 
 class ProfileScreen extends StatelessWidget {
   final VoidCallback? onCheckRecoveryCalendar; // For Calendar tab switch
@@ -19,104 +21,12 @@ class ProfileScreen extends StatelessWidget {
   Future<void> _signOut(BuildContext context) async {
     final appState = Provider.of<AppState>(context, listen: false);
     await ApiService.clearToken();
-    appState.reset();
+    await appState.reset();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => WelcomeScreen(
-            onSignUp: (
-                BuildContext newContext,
-                String username,
-                String password,
-                String phone,
-                String email,
-                String name,
-                String dob,
-                String gender,
-                VoidCallback switchToLogin,
-                ) async {
-              final error = await ApiService.register({
-                'username': username,
-                'password': password,
-                'phone': phone,
-                'email': email,
-                'name': name,
-                'dob': dob,
-                'gender': gender,
-              });
-
-              if (error != null) {
-                showDialog(
-                  context: newContext,
-                  builder: (_) => AlertDialog(
-                    title: const Text("Sign Up Failed"),
-                    content: Text(error),
-                  ),
-                );
-              } else {
-                final appState = Provider.of<AppState>(newContext, listen: false);
-                appState.setUserDetails(
-                  fullName: name,
-                  dob: DateTime.parse(dob),
-                  gender: gender,
-                  username: username,
-                  password: password,
-                  phone: phone,
-                  email: email,
-                );
-                ScaffoldMessenger.of(newContext).showSnackBar(
-                  const SnackBar(content: Text("Sign up successful! Please login.")),
-                );
-                switchToLogin();
-              }
-            },
-            onLogin: (
-                BuildContext newContext,
-                String username,
-                String password
-                ) async {
-              final error = await ApiService.login(username, password);
-
-              if (error != null) {
-                showDialog(
-                  context: newContext,
-                  builder: (_) => AlertDialog(
-                    title: const Text("Login Failed"),
-                    content: Text(error),
-                  ),
-                );
-              } else {
-                final appState = Provider.of<AppState>(newContext, listen: false);
-
-                // Fetch user details using stored token
-                final userDetails = await ApiService.getUserDetails();
-
-                if (userDetails != null) {
-                  appState.setUserDetails(
-                    fullName: userDetails['name'],
-                    dob: DateTime.parse(userDetails['dob']),
-                    gender: userDetails['gender'],
-                    username: userDetails['username'],
-                    password: password,
-                    phone: userDetails['phone'],
-                    email: userDetails['email'],
-                  );
-                  appState.setDepartment(userDetails['department']);
-                  appState.setDoctor(userDetails['doctor']);
-                  appState.setTreatment(userDetails['treatment'], subtype: userDetails['treatment_subtype']);
-                  appState.procedureDate = userDetails['procedure_date'] != null
-                      ? DateTime.parse(userDetails['procedure_date'])
-                      : null;
-                  appState.procedureTime = userDetails['procedure_time'] != null
-                      ? _parseTimeOfDay(userDetails['procedure_time'])
-                      : null;
-                  appState.procedureCompleted =
-                      userDetails['procedure_completed'] == true;
-                }
-              }
-            },
-          ),
+          builder: (_) => WelcomeScreen(),
         ),
             (route) => false,
       );

@@ -13,34 +13,62 @@ class TTOInstructionsScreen extends StatefulWidget {
 }
 
 class _TTOInstructionsScreenState extends State<TTOInstructionsScreen> {
-  // General Instructions
-  final List<String> dosList = [
-    "Eat soft cold foods for at least 2 days.",
-    "Avoid hot, spicy, hard foods.",
-    "Consume tea, coffee at room temperature.",
-    "Take medicines as prescribed by your doctor.",
+  String selectedLang = 'en'; // 'en' for English, 'mr' for Marathi
+  bool showSpecific = false;
+
+  final List<Map<String, String>> dosList = [
+    {
+      "en": "Eat soft cold foods for at least 2 days.",
+      "mr": "किमान २ दिवस सौम्य आणि थंड अन्न खा.",
+    },
+    {
+      "en": "Avoid hot, spicy, hard foods.",
+      "mr": "गरम, तिखट, कडक अन्न टाळा.",
+    },
+    {
+      "en": "Consume tea, coffee at room temperature.",
+      "mr": "चहा, कॉफी खोलीच्या तपमानावर घ्या.",
+    },
+    {
+      "en": "Take medicines as prescribed by your doctor.",
+      "mr": "तुमच्या डॉक्टरांनी सांगितलेल्या प्रमाणे औषधे घ्या.",
+    },
   ];
-  final List<String> dontsList = [
-    "Do not smoke/drink alcohol for 48 hours post extraction.",
-    "Do not spit outside for 2 days and do not use straw for first 24 hours.",
+  final List<Map<String, String>> dontsList = [
+    {
+      "en": "Do not smoke/drink alcohol for 48 hours post extraction.",
+      "mr": "दात काढल्यानंतर ४८ तास धूम्रपान/मद्यपान करू नका.",
+    },
+    {
+      "en": "Do not spit outside for 2 days and do not use straw for first 24 hours.",
+      "mr": "२ दिवस थुंकू नका आणि पहिल्या २४ तासात स्ट्रॉ वापरू नका.",
+    },
   ];
 
-  // Track checklist per day for 15 days
   static const int totalDays = 15;
   late int currentDay;
 
   late List<bool> _dosChecked;
   late List<bool> _specificChecked;
 
-  // Specific Instructions Steps
-  final List<String> specificSteps = [
-    "Bite firmly on the gauze placed in your mouth for at least 45-60 minutes and then gently remove the pack. (Today 8:00 AM)",
-    "After going home, apply ice pack on the area in 15-20 minute intervals till nighttime. (Tomorrow 9:00 AM)",
-    "After removing the pack, take one dosage of medicines prescribed.",
-    "After 24 hours, gargle in that area with lukewarm water and salt at least 3-4 times a day.",
+  final List<Map<String, String>> specificSteps = [
+    {
+      "en": "Bite firmly on the gauze placed in your mouth for at least 45-60 minutes and then gently remove the pack. (Today 8:00 AM)",
+      "mr": "तोंडात ठेवलेल्या गॉजवर किमान ४५-६० मिनिटे घट्ट चावा आणि नंतर हलक्या हाताने काढा. (आज ८:०० AM)",
+    },
+    {
+      "en": "After going home, apply ice pack on the area in 15-20 minute intervals till nighttime. (Tomorrow 9:00 AM)",
+      "mr": "घरी गेल्यावर, त्या भागावर १५-२० मिनिटांच्या अंतराने रात्रीपर्यंत बर्फाचा पॅक लावा. (उद्या ९:०० AM)",
+    },
+    {
+      "en": "After removing the pack, take one dosage of medicines prescribed.",
+      "mr": "पॅक काढल्यानंतर, सांगितलेली औषधे एक वेळ घ्या.",
+    },
+    {
+      "en": "After 24 hours, gargle in that area with lukewarm water and salt at least 3-4 times a day.",
+      "mr": "२४ तासांनंतर, त्या भागात कोमट पाण्यात मीठ घालून दिवसातून किमान ३-४ वेळा गुळण्या करा.",
+    },
   ];
-
-  bool showSpecific = false;
 
   String _generalChecklistKey(int day) => "tto_general_dos_day$day";
   String _specificChecklistKey(int day) => "tto_specific_steps_day$day";
@@ -48,7 +76,6 @@ class _TTOInstructionsScreenState extends State<TTOInstructionsScreen> {
   @override
   void initState() {
     super.initState();
-    // Calculate current day (1 to 15), clamp if > 15
     final now = DateTime.now();
     final procedureDate = DateTime(widget.date.year, widget.date.month, widget.date.day);
     int day = now.difference(procedureDate).inDays + 1;
@@ -58,7 +85,6 @@ class _TTOInstructionsScreenState extends State<TTOInstructionsScreen> {
 
     final appState = Provider.of<AppState>(context, listen: false);
 
-    // Load persisted Do’s checklist for the current day
     _dosChecked = List<bool>.from(appState.getChecklistForKey(_generalChecklistKey(currentDay)));
     if (_dosChecked.length != dosList.length) {
       _dosChecked = List.filled(dosList.length, false);
@@ -67,7 +93,6 @@ class _TTOInstructionsScreenState extends State<TTOInstructionsScreen> {
       });
     }
 
-    // Load persisted Specific Instructions checklist for the current day
     _specificChecked = List<bool>.from(appState.getChecklistForKey(_specificChecklistKey(currentDay)));
     if (_specificChecked.length != specificSteps.length) {
       _specificChecked = List.filled(specificSteps.length, false);
@@ -84,10 +109,9 @@ class _TTOInstructionsScreenState extends State<TTOInstructionsScreen> {
     Provider.of<AppState>(context, listen: false)
         .setChecklistForKey(_generalChecklistKey(currentDay), _dosChecked);
 
-    // FIX: Log (or update) only the changed instruction immediately
     final appState = Provider.of<AppState>(context, listen: false);
     appState.addInstructionLog(
-      dosList[idx],
+      dosList[idx][selectedLang]!,
       date: DateTime.now().toIso8601String().split('T')[0],
       type: "general",
       followed: value,
@@ -104,10 +128,9 @@ class _TTOInstructionsScreenState extends State<TTOInstructionsScreen> {
     Provider.of<AppState>(context, listen: false)
         .setChecklistForKey(_specificChecklistKey(currentDay), _specificChecked);
 
-    // FIX: Log (or update) only the changed instruction immediately
     final appState = Provider.of<AppState>(context, listen: false);
     appState.addInstructionLog(
-      specificSteps[idx],
+      specificSteps[idx][selectedLang]!,
       date: DateTime.now().toIso8601String().split('T')[0],
       type: "specific",
       followed: value,
@@ -117,22 +140,18 @@ class _TTOInstructionsScreenState extends State<TTOInstructionsScreen> {
     );
   }
 
-  /// Build and push a dated record of which instructions were/weren't followed
   void _logInstructionStatusIfNeeded() {
     final appState = Provider.of<AppState>(context, listen: false);
-
     final String dateStr = widget.date.toLocal().toString().split(' ').first;
 
-    // Collect not-followed general instructions for the current day
     final List<String> notFollowedGeneral = [];
     for (int i = 0; i < dosList.length; i++) {
-      if (!_dosChecked[i]) notFollowedGeneral.add(dosList[i]);
+      if (!_dosChecked[i]) notFollowedGeneral.add(dosList[i][selectedLang]!);
     }
 
-    // Collect not-followed specific instructions for the current day
     final List<String> notFollowedSpecific = [];
     for (int i = 0; i < specificSteps.length; i++) {
-      if (!_specificChecked[i]) notFollowedSpecific.add(specificSteps[i]);
+      if (!_specificChecked[i]) notFollowedSpecific.add(specificSteps[i][selectedLang]!);
     }
 
     String buildSection(String title, List<String> list) {
@@ -153,7 +172,6 @@ ${buildSection("General Instructions", notFollowedGeneral)}
 ${buildSection("Specific Instructions", notFollowedSpecific)}
 """.trim();
 
-    // Save to Progress Entries
     appState.addProgressFeedback("Instruction Log", log, date: dateStr);
   }
 
@@ -167,7 +185,23 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
 
   @override
   Widget build(BuildContext context) {
-    int currentDay = totalDays; // at the start of build() or where currentDay is set
+    final appState = Provider.of<AppState>(context);
+    final treatment = appState.treatment;
+    final subtype = appState.treatmentSubtype;
+
+    String title = selectedLang == 'en'
+        ? "General Instructions"
+        : "सामान्य सूचना";
+    if (treatment != null && treatment.isNotEmpty) {
+      title = selectedLang == 'en'
+          ? "Instructions ($treatment${(subtype != null && subtype.isNotEmpty) ? " - $subtype" : ""})"
+          : "सूचना ($treatment${(subtype != null && subtype.isNotEmpty) ? " - $subtype" : ""})";
+    } else {
+      title = selectedLang == 'en'
+          ? "Instructions (Tooth Extraction)"
+          : "सूचना (दात काढणे)";
+    }
+
     if (currentDay >= totalDays) {
       return Scaffold(
         backgroundColor: const Color(0xFFF9FAFB),
@@ -177,7 +211,6 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Animated check/celebration
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(begin: 0, end: 1),
                   duration: const Duration(milliseconds: 800),
@@ -196,7 +229,6 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                   ),
                 ),
                 const SizedBox(height: 28),
-                // Elevated card for message
                 Card(
                   elevation: 6,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -228,7 +260,6 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                   ),
                 ),
                 const SizedBox(height: 34),
-                // Modern rounded button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -259,7 +290,7 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
           ),
         ),
       );
-    }else {
+    } else {
       return Scaffold(
         backgroundColor: Colors.white,
         appBar: showSpecific
@@ -273,7 +304,9 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
             },
           ),
           title: Text(
-            "Specific Instructions - Day $currentDay",
+            selectedLang == 'en'
+                ? "Specific Instructions - Day $currentDay"
+                : "विशिष्ट सूचना - दिवस $currentDay",
             style: const TextStyle(
                 color: Colors.blue, fontWeight: FontWeight.bold),
           ),
@@ -290,14 +323,29 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[100],
+                          foregroundColor: Colors.blue[900],
+                        ),
+                        icon: const Icon(Icons.language, size: 20),
+                        label: Text(selectedLang == 'en' ? 'मराठी' : 'English'),
+                        onPressed: () {
+                          setState(() {
+                            selectedLang = selectedLang == 'en' ? 'mr' : 'en';
+                          });
+                        },
+                      ),
+                    ),
                     if (!showSpecific) ...[
                       Text(
-                        "General Instructions: (Day $currentDay)",
-                        style: const TextStyle(fontWeight: FontWeight.bold,
-                            fontSize: 19),
+                        "$title (Day $currentDay)",
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 18),
-                      // Do's Block
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -319,9 +367,9 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                                   color: Colors.green[700],
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: const Text(
-                                  "Do's",
-                                  style: TextStyle(
+                                child: Text(
+                                  selectedLang == 'en' ? "Do's" : "करावयाच्या गोष्टी",
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
@@ -339,7 +387,7 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                                           .leading,
                                       dense: true,
                                       title: Text(
-                                        dosList[i],
+                                        dosList[i][selectedLang]!,
                                         style: const TextStyle(
                                             fontSize: 15,
                                             color: Colors.green,
@@ -359,7 +407,6 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                           ),
                         ),
                       ),
-                      // Don'ts Block (non-interactive)
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -381,9 +428,9 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                                   color: Colors.red[700],
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: const Text(
-                                  "Don'ts",
-                                  style: TextStyle(
+                                child: Text(
+                                  selectedLang == 'en' ? "Don'ts" : "टाळा",
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
@@ -408,7 +455,7 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                                         const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
-                                            item,
+                                            item[selectedLang]!,
                                             style: const TextStyle(
                                                 fontSize: 15,
                                                 color: Colors.red,
@@ -435,9 +482,11 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          label: const Text(
-                            "View Specific Instructions",
-                            style: TextStyle(
+                          label: Text(
+                            selectedLang == 'en'
+                                ? "View Specific Instructions"
+                                : "विशिष्ट सूचना पहा",
+                            style: const TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           onPressed: () {
@@ -459,9 +508,11 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 15),
                           ),
-                          child: const Text(
-                            "Continue to Dashboard",
-                            style: TextStyle(
+                          child: Text(
+                            selectedLang == 'en'
+                                ? "Continue to Dashboard"
+                                : "डॅशबोर्डवर जा",
+                            style: const TextStyle(
                                 fontSize: 17, fontWeight: FontWeight.bold),
                           ),
                           onPressed: _goToDashboard,
@@ -470,7 +521,9 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                     ] else
                       ...[
                         Text(
-                          "To-Do List After Tooth Extraction (Day $currentDay)",
+                          selectedLang == 'en'
+                              ? "To-Do List After Tooth Extraction (Day $currentDay)"
+                              : "दात काढल्यानंतर करावयाच्या गोष्टी (दिवस $currentDay)",
                           style: const TextStyle(
                               fontSize: 20, fontWeight: FontWeight.bold),
                         ),
@@ -486,7 +539,7 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                                     .leading,
                                 dense: true,
                                 title: Text(
-                                  specificSteps[i],
+                                  specificSteps[i][selectedLang]!,
                                   style: const TextStyle(fontSize: 15),
                                 ),
                                 value: _specificChecked[i],
@@ -511,9 +564,11 @@ ${buildSection("Specific Instructions", notFollowedSpecific)}
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 15),
                             ),
-                            child: const Text(
-                              "Go to Dashboard",
-                              style: TextStyle(
+                            child: Text(
+                              selectedLang == 'en'
+                                  ? "Go to Dashboard"
+                                  : "डॅशबोर्डवर जा",
+                              style: const TextStyle(
                                   fontSize: 17, fontWeight: FontWeight.bold),
                             ),
                             onPressed: _goToDashboard,

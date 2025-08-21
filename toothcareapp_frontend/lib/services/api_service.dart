@@ -8,6 +8,59 @@ class ApiService {
   static const String baseUrl = 'https://tooth-care-app.onrender.com';
 
   // --------------------------
+  // ✅ Verify OTP Only (no password reset)
+  // --------------------------
+  static Future<dynamic> verifyOtp(String emailOrPhone, String otp) async {
+    final url = Uri.parse('https://tooth-care-app.onrender.com/auth/verify-otp');
+    final Map<String, dynamic> body = {
+      emailOrPhone.contains('@') ? 'email' : 'phone': emailOrPhone,
+      'otp': otp,
+    };
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        final res = jsonDecode(response.body);
+        return res['detail'] ?? res['message'] ?? 'OTP verification failed';
+      }
+    } catch (e) {
+      return 'OTP verification failed: $e';
+    }
+  }
+
+  // --------------------------
+  // ✅ Reset Password (after OTP verified)
+  // --------------------------
+  static Future<dynamic> resetPassword(String emailOrPhone, String otp, String newPassword) async {
+    final url = Uri.parse('https://tooth-care-app.onrender.com/auth/reset-password');
+    final Map<String, dynamic> body = {
+      emailOrPhone.contains('@') ? 'email' : 'phone': emailOrPhone,
+      'otp': otp,
+      'new_password': newPassword,
+    };
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        final res = jsonDecode(response.body);
+        return res['detail'] ?? res['message'] ?? 'Failed to reset password';
+      }
+    } catch (e) {
+      return 'Failed to reset password: $e';
+    }
+  }
+
+  // --------------------------
   // ✅ Save Token Helper
   // --------------------------
   static Future<void> saveToken(String token) async {
@@ -58,16 +111,12 @@ class ApiService {
         }
         return null;
       } else {
-        try {
-          final detail = jsonDecode(response.body)['detail'];
-          return _mapSignupError(detail);
-        } catch (_) {
-          return "Signup failed. Please try again.";
-        }
+        // Always return the raw backend error body so UI can decode and use it
+        return response.body;
       }
     } on SocketException {
       return "Unable to connect. Please check your internet connection.";
-    } catch (_) {
+    } catch (e) {
       return "An unexpected error occurred. Please try again.";
     }
   }
@@ -111,16 +160,20 @@ class ApiService {
   // Helper: Map backend signup errors to user-friendly messages
   static String _mapSignupError(String? detail) {
     if (detail == null) return "Signup failed. Please try again.";
-    if (detail.contains("Username already exists")) return "This username is already taken. Please choose another.";
-    if (detail.contains("email already exists")) return "This email is already registered. Try logging in or use another email.";
-    if (detail.toLowerCase().contains("weak password")) return "Password is too weak. Please choose a stronger password.";
+    if (detail.contains("Username already exists"))
+      return "This username is already taken. Please choose another.";
+    if (detail.contains("email already exists"))
+      return "This email is already registered. Try logging in or use another email.";
+    if (detail.toLowerCase().contains("weak password"))
+      return "Password is too weak. Please choose a stronger password.";
     return detail;
   }
 
   // Helper: Map backend login errors to user-friendly messages
   static String _mapLoginError(String? detail) {
     if (detail == null) return "Login failed. Please try again.";
-    if (detail.contains("Incorrect username or password")) return "Incorrect username or password.";
+    if (detail.contains("Incorrect username or password"))
+      return "Incorrect username or password.";
     return detail;
   }
 
@@ -142,7 +195,8 @@ class ApiService {
   static Future<Map<String, dynamic>?> getUserDetails() async {
     try {
       final headers = await getAuthHeaders();
-      final response = await http.get(Uri.parse('$baseUrl/patients/me'), headers: headers);
+      final response = await http.get(
+          Uri.parse('$baseUrl/patients/me'), headers: headers);
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
@@ -176,7 +230,8 @@ class ApiService {
       if (response.statusCode == 200) {
         return true;
       } else {
-        print('Progress submission failed: ${response.statusCode} → ${response.body}');
+        print('Progress submission failed: ${response.statusCode} → ${response
+            .body}');
         return false;
       }
     } catch (e) {
@@ -191,7 +246,8 @@ class ApiService {
   static Future<List<dynamic>?> getProgressEntries() async {
     try {
       final headers = await getAuthHeaders();
-      final response = await http.get(Uri.parse('$baseUrl/progress'), headers: headers);
+      final response = await http.get(
+          Uri.parse('$baseUrl/progress'), headers: headers);
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
@@ -221,7 +277,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return true;
       } else {
-        print('Save department/doctor failed: ${response.statusCode} → ${response.body}');
+        print(
+            'Save department/doctor failed: ${response.statusCode} → ${response
+                .body}');
         return false;
       }
     } catch (e) {
@@ -240,7 +298,8 @@ class ApiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        print('Get episode history failed: ${response.statusCode} → ${response.body}');
+        print('Get episode history failed: ${response.statusCode} → ${response
+            .body}');
         return null;
       }
     } catch (e) {
@@ -272,7 +331,8 @@ class ApiService {
         'treatment': treatment,
         'subtype': subtype,
         'procedure_date': procedureDate.toIso8601String().substring(0, 10),
-        'procedure_time': '${procedureTime.hour.toString().padLeft(2, '0')}:${procedureTime.minute.toString().padLeft(2, '0')}',
+        'procedure_time': '${procedureTime.hour.toString().padLeft(
+            2, '0')}:${procedureTime.minute.toString().padLeft(2, '0')}',
       };
       final response = await http.post(
         url,
@@ -282,7 +342,9 @@ class ApiService {
       if (response.statusCode == 200) {
         return true;
       } else {
-        print('Failed to save treatment info: ${response.statusCode} → ${response.body}');
+        print(
+            'Failed to save treatment info: ${response.statusCode} → ${response
+                .body}');
         return false;
       }
     } catch (e) {
@@ -290,6 +352,92 @@ class ApiService {
       return false;
     }
   }
-}
-// Add this inside your ApiService class
 
+  static Future<dynamic> requestPasswordReset(String emailOrPhone) async {
+    final url = Uri.parse('https://tooth-care-app.onrender.com/auth/request-reset');
+    final Map<String, String> body =
+    emailOrPhone.contains('@') ? {'email': emailOrPhone} : {
+      'phone': emailOrPhone
+    };
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      try {
+        final res = jsonDecode(response.body);
+        return res['detail'] ?? 'Failed to request OTP';
+      } catch (e) {
+        return 'Failed to request OTP';
+      }
+    }
+  }
+
+  static Future<dynamic> requestReset(String emailOrPhone) async {
+    final url = Uri.parse('https://tooth-care-app.onrender.com/auth/request-reset');
+    final Map<String, dynamic> body = {
+      emailOrPhone.contains('@') ? 'email' : 'phone': emailOrPhone,
+    };
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        // Try to decode error, fallback to generic message
+        try {
+          final res = jsonDecode(response.body);
+          // Only show a friendly message, not the whole exception
+          return res['detail'] ?? res['message'] ?? "Failed to send OTP. Please try again.";
+        } catch (_) {
+          return "Failed to send OTP. Please try again.";
+        }
+      }
+    } catch (_) {
+      // Do not show exception details
+      return "Network error. Please check your connection and try again.";
+    }
+  }
+
+  static Future<dynamic> verifyOtpAndResetPassword(String emailOrPhone,
+      String otp, String newPassword) async {
+    final url = Uri.parse('http://tooth-care-app.onrender.com/auth/verify-otp');
+    final Map<String, dynamic> body = {
+      emailOrPhone.contains('@') ? 'email' : 'phone': emailOrPhone,
+      'otp': otp,
+      'new_password': newPassword,
+    };
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        if (response.body == null || response.body.trim().isEmpty) {
+          return 'Failed to reset password: Empty response from server.';
+        }
+        final res = jsonDecode(response.body);
+        return res['detail'] ?? res['message'] ?? 'Failed to reset password';
+      }
+    } catch (e) {
+      return 'Failed to reset password: $e';
+    }
+  }
+}
+
+
+
+// Add this inside your ApiService class

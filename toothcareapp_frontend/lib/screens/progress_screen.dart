@@ -27,13 +27,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeProgress();
+    // Always use a valid username
+    final username = _username.isNotEmpty ? _username : 'default';
+    _initializeProgress(username);
   }
 
-  Future<void> _initializeProgress() async {
+  Future<void> _initializeProgress(String username) async {
     await _loadLocalProgress();
     await Provider.of<AppState>(context, listen: false)
-        .loadInstructionLogs(username: _username);
+        .loadInstructionLogs(username: username);
+    // Debug print to verify logs are loaded
+    final logs = Provider.of<AppState>(context, listen: false).instructionLogs;
+    print('Loaded instruction logs for $username: count = \\${logs.length}');
     await fetchProgressEntries();
   }
 

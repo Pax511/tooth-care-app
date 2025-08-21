@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'treatment_history_screen.dart';
 import '../app_state.dart';
-import '../services/api_service.dart';
 import 'calendar_screen.dart';
 import 'tto_instructions_screen.dart';
 import 'pfd_instructions_screen.dart';
@@ -21,6 +19,8 @@ import 'profile_screen.dart';
 import 'category_screen.dart';
 import 'treatment_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'treatment_history_screen.dart';
+import '../auth_callbacks.dart'; // <-- ADD THIS IMPORT
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -52,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _selectedIndex = 2; // Instructions tab
           });
         },
+
       ),
     ];
   }
@@ -68,64 +69,50 @@ class _HomeScreenState extends State<HomeScreen> {
     final String? subtype = appState.treatmentSubtype;
 
     if (treatment == "Tooth Taken Out") {
-      return TTOInstructionsScreen(date: appState.procedureDate!);
+      return TTOInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
     }
     if (treatment == "Prosthesis Fitted") {
       if (subtype == "Fixed Dentures") {
-        return PFDInstructionsScreen(date: appState.procedureDate!);
+        return PFDInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
       } else if (subtype == "Removable Dentures") {
-        return PRDInstructionsScreen(date: appState.procedureDate!);
+        return PRDInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
       }
     }
     if (treatment == "Root Canal/Filling") {
-      return RootCanalInstructionsScreen(date: appState.procedureDate!);
+      return RootCanalInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
     }
     if (treatment == "Implant") {
       if (subtype == "First Stage") {
-        return IFSInstructionsScreen(date: appState.procedureDate!);
+        return IFSInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
       } else if (subtype == "Second Stage") {
-        return ISSInstructionsScreen(date: appState.procedureDate!);
+        return ISSInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
       }
     }
-    // --- Updated Tooth Fracture logic ---
-    if (treatment == "Tooth Fracture" && subtype != null) {
-      switch (subtype) {
-        case "Filling":
-          return const FillingInstructionsScreen();
-        case "Teeth Cleaning":
-          return const TCInstructionsScreen();
-        case "Teeth Whitening":
-          return const TWInstructionsScreen();
-        case "Gum Surgery":
-          return const GSInstructionsScreen();
-        case "Veneers/Laminates":
-          return const VLInstructionsScreen();
-        default:
-          return const FillingInstructionsScreen();
-      }
-    }
-    // --- Also allow direct selection as before ---
-    if (treatment == "Filling") {
-      return const FillingInstructionsScreen();
-    }
-    if (treatment == "Teeth Cleaning") {
-      return const TCInstructionsScreen();
-    }
-    if (treatment == "Teeth Whitening") {
-      return const TWInstructionsScreen();
-    }
-    if (treatment == "Gum Surgery") {
-      return const GSInstructionsScreen();
-    }
-    if (treatment == "Veneers/Laminates") {
-      return const VLInstructionsScreen();
-    }
+
     if (treatment == "Braces") {
-      return BracesInstructionsScreen(date: appState.procedureDate!);
+      return BracesInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
     }
+    if (treatment == "Tooth Fracture") {
+      if (subtype == "Filling") {
+        return FillingInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+      }
+      else if (subtype == "Teeth Cleaning") {
+        return TCInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+      }
+      else if (subtype == "Teeth Whitening") {
+        return TWInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+      }
+      else if (subtype == "Gum Surgery") {
+        return GSInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+      }
+      else if (subtype == "Veneers/Laminates") {
+        return VLInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+      }
+      return const _NoInstructionsSelected();
+    }
+    // This line fixes the error!
     return const _NoInstructionsSelected();
   }
-
   @override
   Widget build(BuildContext context) {
     List<Widget> pages = List<Widget>.from(_pages);
@@ -137,18 +124,6 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
-          // --- Treatment History Icon Button ---
-          // In your AppBar actions in home_screen.dart:
-          IconButton(
-            icon: const Icon(Icons.history, color: Colors.blueAccent),
-            tooltip: 'View Treatment History',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const TreatmentHistoryScreen()),
-              );
-            },
-          ),
-          // --- Existing menu icon ---
           IconButton(
             icon: const Icon(Icons.menu),
             onPressed: () {
@@ -160,6 +135,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 builder: (BuildContext context) {
                   return const TreatmentOptionsSheet();
                 },
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.history), // <-- Add history icon
+            tooltip: 'Treatment History',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TreatmentHistoryScreen()),
               );
             },
           ),
@@ -391,28 +375,28 @@ class HomeMainContent extends StatelessWidget {
       {
         'title': 'Gentle Brushing',
         'icon': Icons.medical_services,
-        'desc': 'How to brush after extraction\nAvoid the extraction site',
+        'desc': '',
         'duration': '2 min',
         'bgColor': const Color(0xFFE6F0FB),
       },
       {
         'title': 'Salt Water Rinse',
         'icon': Icons.opacity,
-        'desc': 'Proper rinsing technique\nAfter 24 hours',
+        'desc': '',
         'duration': '2 min',
         'bgColor': const Color(0xFFE5F7F1),
       },
       {
         'title': 'Ice Application',
         'icon': Icons.ac_unit,
-        'desc': 'How to apply ice safely\nReduce swelling',
+        'desc': '',
         'duration': '2 min',
         'bgColor': const Color(0xFFF2EBFD),
       },
       {
         'title': 'Soft Foods',
         'icon': Icons.restaurant,
-        'desc': 'Recovery diet guidelines\nFood recommendations',
+        'desc': '',
         'duration': '2 min',
         'bgColor': const Color(0xFFFFF2E5),
       },

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../app_state.dart';
+import '../services/api_service.dart';
 import 'treatment_screen.dart';
 import 'welcome_screen.dart';
 
@@ -27,8 +28,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
   ];
 
   final Map<String, List<String>> departmentDoctors = {
-    // ... (same as your full doctor list)
-    // Keep this unchanged for brevity.
     "Periodontology": [
       "Dr. Vineet Kini",
       "Dr. Sarika Shetty",
@@ -37,7 +36,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
       "Dr. Trupti Naykodi",
       "Dr. Agraja Patil",
     ],
-    // ... (other departments)
     "Conservative Dentistry & Endodontics": [
       "Dr. Sumanthini M. V.",
       "Dr. Anuradha Patil.",
@@ -127,8 +125,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
       "Dr. Mausami Malgaonkar",
       "Dr. Kashmira Kadam",
     ],
-    // ... (other departments)
-    // Make sure you copy all the departmentDoctors content from your original code.
   };
 
   String? selectedDepartment;
@@ -166,6 +162,31 @@ class _CategoryScreenState extends State<CategoryScreen> {
     }
   }
 
+  Future<void> _onContinue() async {
+    final appState = Provider.of<AppState>(context, listen: false);
+    appState.setDepartment(selectedDepartment);
+    appState.setDoctor(selectedDoctor);
+
+
+    // SAVE TO BACKEND
+    final userName = appState.username ?? "User";
+    await saveDepartmentDoctor(
+      userName,
+      selectedDepartment!,
+      selectedDoctor!,
+    );
+
+    // Navigate to next screen
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TreatmentScreenMain(
+          userName: userName,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final userName =
@@ -181,32 +202,13 @@ class _CategoryScreenState extends State<CategoryScreen> {
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
               await prefs.remove('token');
-
+              // Clear all in-memory user/account state
+              final appState = Provider.of<AppState>(context, listen: false);
+               appState.clearUserData();
               if (!mounted) return;
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => WelcomeScreen(
-                    // FIX: Signature must match WelcomeScreen
-                    onSignUp: (
-                        BuildContext ctx,
-                        String u,
-                        String p,
-                        String ph,
-                        String e,
-                        String n,
-                        String d,
-                        String g,
-                        VoidCallback s,
-                        ) async {},
-                    onLogin: (
-                        BuildContext ctx,
-                        String u,
-                        String p,
-                        ) async {},
-                  ),
-                ),
-                    (_) => false,
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                    (route) => false,
               );
             },
           ),
@@ -267,27 +269,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
           ? Padding(
         padding: const EdgeInsets.all(16.0),
         child: ElevatedButton(
-          onPressed: () async {
-            Provider.of<AppState>(context, listen: false)
-              ..setDepartment(selectedDepartment!)
-              ..setDoctor(selectedDoctor);
-
-            // SAVE TO BACKEND
-            await saveDepartmentDoctor(
-              userName,
-              selectedDepartment!,
-              selectedDoctor!,
-            );
-
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TreatmentScreenMain(
-                  userName: userName,
-                ),
-              ),
-            );
-          },
+          onPressed: _onContinue,
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 18),
             backgroundColor: Colors.blue,

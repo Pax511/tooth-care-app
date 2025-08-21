@@ -13,6 +13,13 @@ class AppState extends ChangeNotifier {
   String? email;
   String? token;
 
+  // Computed category selection flag
+  bool get hasSelectedCategory =>
+      department != null && department!.isNotEmpty &&
+          doctor != null && doctor!.isNotEmpty &&
+          treatment != null && treatment!.isNotEmpty &&
+          procedureDate != null;
+
   // Procedure details
   DateTime? procedureDate;
   TimeOfDay? procedureTime;
@@ -115,17 +122,58 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Getters for private fields
   String? get department => _department;
   String? get doctor => _doctor;
   String? get treatment => _treatment;
   String? get treatmentSubtype => _treatmentSubtype;
   String? get implantStage => _implantStage;
 
-  final Map<String, List<String>> _treatmentInstructions = {
-    // Populate your actual instruction mapping here
-    // Example:
-    // "Prosthesis": ["Do 1", "Do 2", "Do 3", "Do 4", "Don't 1", "Don't 2", "Step 1", "Step 2"]
-  };
+  // Setters for private fields
+  void setDepartment(String? value) {
+    if (_department != value) {
+      _department = value;
+      _saveUserDetails();
+      notifyListeners();
+    }
+  }
+
+  void setDoctor(String? value) {
+    if (_doctor != value) {
+      _doctor = value;
+      _saveUserDetails();
+      notifyListeners();
+    }
+  }
+
+  void setTreatment(String? treatment, {String? subtype, DateTime? procedureDate}) {
+    if (_treatment != treatment || _treatmentSubtype != subtype) {
+      _treatment = treatment;
+      _treatmentSubtype = subtype;
+      if (treatment == 'Implant' && subtype != null) {
+        final parts = subtype.split('\n').first.trim();
+        _implantStage = parts;
+      } else {
+        _implantStage = null;
+      }
+      if (procedureDate != null) {
+        this.procedureDate = procedureDate;
+      }
+      _saveUserDetails();
+      notifyListeners();
+    }
+  }
+
+  void setTreatmentSubtype(String? value) {
+    if (_treatmentSubtype != value) {
+      _treatmentSubtype = value;
+      _saveUserDetails();
+      notifyListeners();
+    }
+  }
+
+  // Treatment instructions
+  final Map<String, List<String>> _treatmentInstructions = {};
 
   List<String> get currentTreatmentInstructions {
     if (_treatment == null) return [];
@@ -171,44 +219,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setToken(String token) {
+  Future<void> setToken(String token) async {
     this.token = token;
-    _saveUserDetails();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('token', token);
+    await _saveUserDetails();
     notifyListeners();
   }
-
-  void setDepartment(String? value) {
-    if (_department != value) {
-      _department = value;
-      _saveUserDetails();
-      notifyListeners();
-    }
-  }
-
-  void setDoctor(String? value) {
-    if (_doctor != value) {
-      _doctor = value;
-      _saveUserDetails();
-      notifyListeners();
-    }
-  }
-
-  void setTreatment(String? treatment,
-      {String? subtype, DateTime? procedureDate}) {
-    if (_treatment != treatment || _treatmentSubtype != subtype) {
-      _treatment = treatment;
-      _treatmentSubtype = subtype;
-      if (treatment == 'Implant' && subtype != null) {
-        final parts = subtype.split('\n').first.trim();
-        _implantStage = parts;
-      } else {
-        _implantStage = null;
-      }
-      if (procedureDate != null) {
-        this.procedureDate = procedureDate;
-      }
-      _saveUserDetails();
-      notifyListeners();
+  /// Sync token from SharedPreferences to AppState.token (call at startup)
+  Future<void> syncTokenFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final tokenFromPrefs = prefs.getString('token');
+    if (tokenFromPrefs != null && tokenFromPrefs != token) {
+      setToken(tokenFromPrefs);
     }
   }
 
@@ -251,7 +274,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void reset() {
+  Future<void> reset() async {
     fullName = null;
     dob = null;
     gender = null;
@@ -272,6 +295,10 @@ class AppState extends ChangeNotifier {
     _persistedChecklists.clear();
     _progressFeedback.clear();
     _instructionLogs.clear();
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.remove('token');
+      prefs.remove('user_details');
+    });
     _saveInstructionLogs(username: username);
     _saveUserDetails();
     notifyListeners();
@@ -326,11 +353,13 @@ class AppState extends ChangeNotifier {
           ? "${procedureTime!.hour.toString().padLeft(2, '0')}:${procedureTime!.minute.toString().padLeft(2, '0')}"
           : null,
     }));
+    // No need to store hasSelectedCategory in SharedPreferences
   }
 
   Future<void> loadUserDetails() async {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getString('user_details');
+    String? loadedToken = prefs.getString('token');
     if (data != null) {
       final decoded = jsonDecode(data);
       fullName = decoded['fullName'];
@@ -340,7 +369,7 @@ class AppState extends ChangeNotifier {
       password = decoded['password'];
       phone = decoded['phone'];
       email = decoded['email'];
-      token = decoded['token'];
+      token = decoded['token'] ?? loadedToken;
       _department = decoded['department'];
       _doctor = decoded['doctor'];
       _treatment = decoded['treatment'];
@@ -350,7 +379,33 @@ class AppState extends ChangeNotifier {
       procedureDate = decoded['procedureDate'] != null ? DateTime.parse(decoded['procedureDate']) : null;
       procedureTime = decoded['procedureTime'] != null ? _parseTimeOfDay(decoded['procedureTime']) : null;
       notifyListeners();
+    } else {
+      if (loadedToken != null) {
+        token = loadedToken;
+        notifyListeners();
+      }
     }
+  }
+
+  // Properly use setters for private fields (fixes direct assignment error)
+  void clearUserData() async {
+    username = null;
+    fullName = null;
+    dob = null;
+    gender = null;
+    phone = null;
+    email = null;
+    setDepartment(null);
+    setDoctor(null);
+    setTreatment(null, subtype: null);
+    setTreatmentSubtype(null);
+    procedureDate = null;
+    procedureTime = null;
+    procedureCompleted = false;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_details');
   }
 
   void updatePersonalInfo({
@@ -369,7 +424,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Utility to parse "HH:mm:ss" or "HH:mm" string to TimeOfDay
   static TimeOfDay? _parseTimeOfDay(dynamic timeStr) {
     if (timeStr == null) return null;
     final str = timeStr is String ? timeStr : timeStr.toString();

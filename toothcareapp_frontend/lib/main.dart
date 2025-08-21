@@ -10,12 +10,20 @@ import 'screens/home_screen.dart';
 import 'screens/treatment_screen.dart';
 import 'screens/pfd_instructions_screen.dart';
 import 'screens/prd_instructions_screen.dart';
+import '../auth_callbacks.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final appState = AppState();
+  await appState.syncTokenFromPrefs();       // <-- Ensure token is loaded!
   await appState.loadInstructionLogs();
+  await appState.loadUserDetails();
+
+  // Debug: Print token value on startup
+  print('Token on startup: ${appState.token}');
+  final prefs = await SharedPreferences.getInstance();
+  print('Token in prefs: ${prefs.getString('token')}');
 
   runApp(
     ChangeNotifierProvider(
@@ -60,7 +68,6 @@ class ToothCareGuideApp extends StatelessWidget {
               builder: (context) => PRDInstructionsScreen(date: date),
             );
           }
-          // Add more routes for other treatments if needed
         }
 
         return MaterialPageRoute(
@@ -69,13 +76,14 @@ class ToothCareGuideApp extends StatelessWidget {
           ),
         );
       },
-      home: AppEntryGate(),
+      home: const AppEntryGate(),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
 class AppEntryGate extends StatefulWidget {
+  const AppEntryGate({super.key});
   @override
   State<AppEntryGate> createState() => _AppEntryGateState();
 }
@@ -90,6 +98,71 @@ class _AppEntryGateState extends State<AppEntryGate> {
   }
 
   Future<void> _checkAutoLogin() async {
+    final appState = Provider.of<AppState>(context, listen: false);
+
+    // If user data exists (from shared prefs), skip login!
+    if (appState.token != null && appState.username != null) {
+      // If all info is present, go directly to HomeScreen or instructions
+      if (appState.department != null &&
+          appState.doctor != null &&
+          appState.treatment != null &&
+          appState.procedureDate != null &&
+          appState.procedureTime != null &&
+          appState.procedureCompleted == false) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Fixed') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PFDInstructionsScreen(date: appState.procedureDate!),
+              ),
+            );
+          } else if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Removable') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PRDInstructionsScreen(date: appState.procedureDate!),
+              ),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+            );
+          }
+        });
+        return;
+      }
+      // If only category info is present, but treatment is missing
+      if (appState.department != null &&
+          appState.doctor != null &&
+          (appState.treatment == null ||
+              appState.procedureDate == null ||
+              appState.procedureTime == null)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => TreatmentScreenMain(userName: appState.username ?? "User")),
+          );
+        });
+        return;
+      }
+      // If nothing, go to category
+      if (appState.department == null || appState.doctor == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const CategoryScreen()),
+          );
+        });
+        return;
+      }
+
+      setState(() => _loading = false);
+      return;
+    }
+
+    // If not persisted, fallback to API check (for first run/after logout)
     final isLoggedIn = await ApiService.checkIfLoggedIn();
     if (!isLoggedIn) {
       setState(() => _loading = false);
@@ -102,7 +175,6 @@ class _AppEntryGateState extends State<AppEntryGate> {
       return;
     }
 
-    final appState = Provider.of<AppState>(context, listen: false);
     appState.setUserDetails(
       fullName: userDetails['name'],
       dob: DateTime.parse(userDetails['dob']),
@@ -112,7 +184,6 @@ class _AppEntryGateState extends State<AppEntryGate> {
       phone: userDetails['phone'],
       email: userDetails['email'],
     );
-    // Set additional info if available
     appState.setDepartment(userDetails['department']);
     appState.setDoctor(userDetails['doctor']);
     appState.setTreatment(userDetails['treatment'], subtype: userDetails['treatment_subtype']);
@@ -120,10 +191,9 @@ class _AppEntryGateState extends State<AppEntryGate> {
         ? DateTime.parse(userDetails['procedure_date'])
         : null;
     appState.procedureTime = parseTimeOfDay(userDetails['procedure_time']);
-    appState.procedureCompleted =
-        userDetails['procedure_completed'] == true;
+    appState.procedureCompleted = userDetails['procedure_completed'] == true;
 
-    // Auto-skip logic
+    // Repeat the same auto-skip logic after login
     if (appState.department != null &&
         appState.doctor != null &&
         appState.treatment != null &&
@@ -155,7 +225,6 @@ class _AppEntryGateState extends State<AppEntryGate> {
       return;
     }
 
-    // If only category info is present, but treatment is missing
     if (appState.department != null &&
         appState.doctor != null &&
         (appState.treatment == null ||
@@ -170,7 +239,6 @@ class _AppEntryGateState extends State<AppEntryGate> {
       return;
     }
 
-    // If nothing, go to category
     if (appState.department == null || appState.doctor == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushReplacement(
@@ -215,15 +283,14 @@ class _AppEntryGateState extends State<AppEntryGate> {
         });
 
         if (error != null) {
-          showDialog(
-            context: context,
-            builder: (_) => AlertDialog(
-              title: const Text("Sign Up Failed"),
-              content: Text(error),
-            ),
-          );
+          // Optionally, show error dialog here, or let WelcomeScreen handle it
+          return error; // <-- Fix: Return the error to WelcomeScreen
         } else {
           final appState = Provider.of<AppState>(context, listen: false);
+          final token = await ApiService.getSavedToken();
+          if (token != null) {
+            appState.setToken(token);
+          }
           appState.setUserDetails(
             fullName: name,
             dob: DateTime.parse(dob),
@@ -233,19 +300,19 @@ class _AppEntryGateState extends State<AppEntryGate> {
             phone: phone,
             email: email,
           );
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Sign up successful! Please login.")),
-          );
+          // Optionally, show success snack bar, but let WelcomeScreen show dialog
           switchToLogin();
+          return null; // <-- Fix: Return null to WelcomeScreen
         }
       },
       onLogin: (
-          BuildContext context, // <-- Accept context as first argument!
+          BuildContext context,
           String username,
-          String password
+          String password,
           ) async {
+        print('Attempting login...');
         final error = await ApiService.login(username, password);
+        print('Login response: $error');
 
         if (error != null) {
           showDialog(
@@ -257,8 +324,13 @@ class _AppEntryGateState extends State<AppEntryGate> {
           );
         } else {
           final appState = Provider.of<AppState>(context, listen: false);
+          // --- Ensure token is stored after login ---
+          final token = await ApiService.getSavedToken();
+          if (token != null) {
+            appState.setToken(token);
+          }
 
-          // ✅ Fetch full user details using stored token
+          // Fetch full user details using stored token
           final userDetails = await ApiService.getUserDetails();
 
           if (userDetails != null) {
@@ -278,8 +350,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
                 ? DateTime.parse(userDetails['procedure_date'])
                 : null;
             appState.procedureTime = parseTimeOfDay(userDetails['procedure_time']);
-            appState.procedureCompleted =
-                userDetails['procedure_completed'] == true;
+            appState.procedureCompleted = userDetails['procedure_completed'] == true;
           }
 
           // Now repeat the auto-skip logic after login
