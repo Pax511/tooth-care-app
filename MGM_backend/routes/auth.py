@@ -1,3 +1,14 @@
+from fastapi import APIRouter, Depends
+from typing import Optional
+from pydantic import BaseModel, EmailStr
+
+router = APIRouter()
+
+# Minimal request schema for OTP endpoints
+class RequestResetSchema(BaseModel):
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+from pydantic import BaseModel
 # --- Signup OTP Verification ---
 class SignupOtpSchema(BaseModel):
     email: Optional[EmailStr] = None
