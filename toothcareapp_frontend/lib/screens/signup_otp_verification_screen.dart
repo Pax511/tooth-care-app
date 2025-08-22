@@ -11,6 +11,27 @@ class SignupOtpVerificationScreen extends StatefulWidget {
 }
 
 class SignupOtpVerificationScreenState extends State<SignupOtpVerificationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // If email is missing, show error and redirect to WelcomeScreen
+    if (widget.email.trim().isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const WelcomeScreen(),
+            settings: const RouteSettings(arguments: 'Missing email. Please sign up again.'),
+          ),
+          (route) => false,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Missing email. Please sign up again.')),
+        );
+      });
+    }
+    _otpController.addListener(() => setState(() {}));
+    _startResendTimer();
+  }
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _otpController = TextEditingController();
   String _error = '';
@@ -19,13 +40,6 @@ class SignupOtpVerificationScreenState extends State<SignupOtpVerificationScreen
   int _resendCooldown = 30;
   int _secondsLeft = 0;
   String _resendMessage = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _otpController.addListener(() => setState(() {}));
-    _startResendTimer();
-  }
 
   void _startResendTimer() {
     setState(() {
@@ -69,6 +83,7 @@ class SignupOtpVerificationScreenState extends State<SignupOtpVerificationScreen
       _error = '';
     });
 
+    print('Verifying signup OTP with email: [32m${widget.email}[0m');
     final result = await ApiService.verifySignupOtp(widget.email, _otpController.text);
     setState(() {
       _loading = false;

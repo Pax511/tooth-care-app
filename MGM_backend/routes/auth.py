@@ -104,6 +104,13 @@ async def verify_signup_otp(data: SignupOtpSchema, db: AsyncSession = Depends(ge
         raise HTTPException(status_code=404, detail="User not found.")
     setattr(user, "is_verified", True)
     await db.commit()
+    # Send registration email after successful verification
+    try:
+        if data.email:
+            from utils import send_registration_email
+            send_registration_email(data.email, getattr(user, 'name', 'User'))
+    except Exception as e:
+        print("Error sending registration email:", e)
     try:
         del otp_store[target]
     except Exception as e:

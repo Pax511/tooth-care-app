@@ -262,38 +262,47 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       return "Agreement Required";
     }
     if (_signUpFormKey.currentState?.validate() ?? false) {
-      _signUpFormKey.currentState!.save();
-      // Get values from controllers for actual signup data
-      _signupUsername = _signupUsernameController.text;
-      _signupPassword = _signupPasswordController.text;
-      _signupPhone = _signupPhoneController.text;
-      _signupEmail = _signupEmailController.text;
-      _signupName = _signupNameController.text;
+  _signUpFormKey.currentState!.save();
+  // Get values from controllers for actual signup data
+  _signupUsername = _signupUsernameController.text;
+  _signupPassword = _signupPasswordController.text;
+  _signupPhone = _signupPhoneController.text;
+  _signupEmail = _signupEmailController.text;
+  _signupName = _signupNameController.text;
       setState(() {
         _isLoading = true;
       });
       try {
         // 1. Register user (do not auto-login)
         final error = await ApiService.register({
-          'username': _signupUsername,
-          'password': _signupPassword,
-          'phone': _signupPhone,
-          'email': _signupEmail,
-          'name': _signupName,
+          'username': _signupUsernameController.text,
+          'password': _signupPasswordController.text,
+          'phone': _signupPhoneController.text,
+          'email': _signupEmailController.text,
+          'name': _signupNameController.text,
           'dob': _signupDob,
           'gender': _signupGender,
         });
         if (error == null) {
           // 2. Request signup OTP
-          final otpResult = await ApiService.requestSignupOtp(_signupEmail);
+          final otpEmail = _signupEmailController.text;
+          print('DEBUG: Email before OTP request: ' + otpEmail);
+          final otpResult = await ApiService.requestSignupOtp(otpEmail);
+          print('DEBUG: Email before guard clause: ' + otpEmail);
           if (otpResult == true) {
             // 3. Navigate to OTP verification screen for signup
+            print('Navigating to OTP screen with email: \x1b[32m' + otpEmail + '\x1b[0m');
+            if (otpEmail.trim().isEmpty) {
+              print('DEBUG: Blocked navigation due to empty email!');
+              _showErrorDialog('Signup Error', 'Email is missing. Please enter your email and try again.');
+              return null;
+            }
             if (mounted) {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
                   builder: (_) => SignupOtpVerificationScreen(
-                    email: _signupEmail,
+                    email: otpEmail,
                   ),
                 ),
               );
