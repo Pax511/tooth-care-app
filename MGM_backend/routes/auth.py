@@ -1,8 +1,14 @@
-from MGM_backend.database import get_db
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from typing import Optional
 from pydantic import BaseModel, EmailStr
+import random
+from ..database import get_db
+from ..models import Patient, Doctor
+
+# In-memory store for OTPs (for demo; use DB or cache for production)
+otp_store = {}
 
 router = APIRouter()
 
@@ -10,7 +16,18 @@ router = APIRouter()
 class RequestResetSchema(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
-from pydantic import BaseModel
+
+class VerifyOtpSchema(BaseModel):
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    otp: str
+
+class ResetPasswordSchema(BaseModel):
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    otp: str
+    new_password: str
+
 # --- Signup OTP Verification ---
 class SignupOtpSchema(BaseModel):
     email: Optional[EmailStr] = None
@@ -85,41 +102,13 @@ async def verify_signup_otp(data: SignupOtpSchema, db: AsyncSession = Depends(ge
             user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-    user.is_verified = True
+    setattr(user, "is_verified", True)
     await db.commit()
     try:
         del otp_store[target]
     except Exception as e:
         print("Error deleting signup OTP:", e)
     return {"message": "Signup verified"}
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
-import random
-from typing import Optional
-from models import Patient, Doctor  # Adjust import if needed
-from database import get_db  # Adjust import if needed
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-
-# In-memory store for OTPs (for demo; use DB or cache for production)
-otp_store = {}
-
-router = APIRouter()
-
-class RequestResetSchema(BaseModel):
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-
-class VerifyOtpSchema(BaseModel):
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    otp: str
-
-class ResetPasswordSchema(BaseModel):
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    otp: str
-    new_password: str
 
 @router.post("/auth/request-reset")
 async def request_reset(data: RequestResetSchema, db: AsyncSession = Depends(get_db)):
