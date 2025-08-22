@@ -8,14 +8,18 @@ class ApiService {
   static const String baseUrl = 'https://tooth-care-app.onrender.com';
 
   // --------------------------
-  // ✅ Verify OTP Only (no password reset)
+  // ✅ Step 1: Verify OTP Only (no password reset)
   // --------------------------
   static Future<dynamic> verifyOtp(String emailOrPhone, String otp) async {
     final url = Uri.parse('https://tooth-care-app.onrender.com/auth/verify-otp');
-    final Map<String, dynamic> body = {
-      emailOrPhone.contains('@') ? 'email' : 'phone': emailOrPhone,
-      'otp': otp,
-    };
+    final Map<String, dynamic> body = {};
+    if (emailOrPhone.contains('@')) {
+      body['email'] = emailOrPhone;
+    } else {
+      body['phone'] = emailOrPhone;
+    }
+    body['otp'] = otp;
+    print('VERIFY OTP BODY: ' + jsonEncode(body));
     try {
       final response = await http.post(
         url,
@@ -34,15 +38,19 @@ class ApiService {
   }
 
   // --------------------------
-  // ✅ Reset Password (after OTP verified)
+  // ✅ Step 2: Reset Password (requires OTP)
   // --------------------------
   static Future<dynamic> resetPassword(String emailOrPhone, String otp, String newPassword) async {
     final url = Uri.parse('https://tooth-care-app.onrender.com/auth/reset-password');
-    final Map<String, dynamic> body = {
-      emailOrPhone.contains('@') ? 'email' : 'phone': emailOrPhone,
-      'otp': otp,
-      'new_password': newPassword,
-    };
+    final Map<String, dynamic> body = {};
+    if (emailOrPhone.contains('@')) {
+      body['email'] = emailOrPhone;
+    } else {
+      body['phone'] = emailOrPhone;
+    }
+    body['otp'] = otp;
+    body['new_password'] = newPassword;
+    print('RESET PASSWORD BODY: ' + jsonEncode(body));
     try {
       final response = await http.post(
         url,
@@ -53,12 +61,13 @@ class ApiService {
         return true;
       } else {
         final res = jsonDecode(response.body);
-        return res['detail'] ?? res['message'] ?? 'Failed to reset password';
+        return res['detail'] ?? res['message'] ?? 'Password reset failed';
       }
     } catch (e) {
-      return 'Failed to reset password: $e';
+      return 'Password reset failed: $e';
     }
   }
+
 
   // --------------------------
   // ✅ Save Token Helper
@@ -353,36 +362,16 @@ class ApiService {
     }
   }
 
-  static Future<dynamic> requestPasswordReset(String emailOrPhone) async {
-    final url = Uri.parse('https://tooth-care-app.onrender.com/auth/request-reset');
-    final Map<String, String> body =
-    emailOrPhone.contains('@') ? {'email': emailOrPhone} : {
-      'phone': emailOrPhone
-    };
-
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-
-    if (response.statusCode == 200) {
-      return true;
-    } else {
-      try {
-        final res = jsonDecode(response.body);
-        return res['detail'] ?? 'Failed to request OTP';
-      } catch (e) {
-        return 'Failed to request OTP';
-      }
-    }
-  }
 
   static Future<dynamic> requestReset(String emailOrPhone) async {
     final url = Uri.parse('https://tooth-care-app.onrender.com/auth/request-reset');
-    final Map<String, dynamic> body = {
-      emailOrPhone.contains('@') ? 'email' : 'phone': emailOrPhone,
-    };
+    final Map<String, dynamic> body = {};
+    if (emailOrPhone.contains('@')) {
+      body['email'] = emailOrPhone;
+    } else {
+      body['phone'] = emailOrPhone;
+    }
+    print('REQUEST RESET BODY: ' + jsonEncode(body));
 
     try {
       final response = await http.post(
@@ -408,34 +397,6 @@ class ApiService {
     }
   }
 
-  static Future<dynamic> verifyOtpAndResetPassword(String emailOrPhone,
-      String otp, String newPassword) async {
-    final url = Uri.parse('http://tooth-care-app.onrender.com/auth/verify-otp');
-    final Map<String, dynamic> body = {
-      emailOrPhone.contains('@') ? 'email' : 'phone': emailOrPhone,
-      'otp': otp,
-      'new_password': newPassword,
-    };
-
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
-      if (response.statusCode == 200) {
-        return true;
-      } else {
-        if (response.body == null || response.body.trim().isEmpty) {
-          return 'Failed to reset password: Empty response from server.';
-        }
-        final res = jsonDecode(response.body);
-        return res['detail'] ?? res['message'] ?? 'Failed to reset password';
-      }
-    } catch (e) {
-      return 'Failed to reset password: $e';
-    }
-  }
 }
 
 

@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import 'login_screen.dart';
 import 'password_reset_success_screen.dart';
 
-class ResetPasswordScreen extends StatefulWidget {
+class SetNewPasswordScreen extends StatefulWidget {
   final String emailOrPhone;
   final String otp;
-  const ResetPasswordScreen({super.key, required this.emailOrPhone, required this.otp});
+  const SetNewPasswordScreen({super.key, required this.emailOrPhone, required this.otp});
 
   @override
-  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+  State<SetNewPasswordScreen> createState() => _SetNewPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+class _SetNewPasswordScreenState extends State<SetNewPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   String _newPassword = '';
   String _confirmPassword = '';
   String _error = '';
   bool _loading = false;
 
-  Future<void> _resetPassword() async {
+  Future<void> _setPassword() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     _formKey.currentState!.save();
 
@@ -54,7 +53,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Reset Password')),
+      appBar: AppBar(title: const Text('Set New Password')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32.0),
@@ -64,7 +63,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  "Set a new password",
+                  "Enter your new password",
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 24),
@@ -84,7 +83,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   decoration: const InputDecoration(
-                    labelText: "Confirm Password",
+                    labelText: "Confirm New Password",
                     border: OutlineInputBorder(),
                   ),
                   obscureText: true,
@@ -99,12 +98,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 _loading
                     ? const CircularProgressIndicator()
                     : SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _resetPassword,
-                    child: const Text("Reset Password"),
-                  ),
-                ),
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _setPassword,
+                          child: const Text("Set Password"),
+                        ),
+                      ),
                 if (_error.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),

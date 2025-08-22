@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'package:flutter/services.dart';
 import 'login_screen.dart';
+import 'set_new_password_screen.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String emailOrPhone;
@@ -12,20 +14,21 @@ class OtpVerificationScreen extends StatefulWidget {
 
 
 class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
-  final _formKey = GlobalKey<FormState>();
-  String _otp = '';
+  @override
+  void initState() {
+    super.initState();
+    _otpController.addListener(() => setState(() {}));
+    _startResendTimer();
+  }
+  String get _otp => _otpController.text;
   String _error = '';
   bool _loading = false;
   bool _resending = false;
   int _resendCooldown = 30;
   int _secondsLeft = 0;
   String _resendMessage = '';
-  
-  @override
-  void initState() {
-    super.initState();
-    _startResendTimer();
-  }
+
+  // Removed duplicate initState
 
   void _startResendTimer() {
     setState(() {
@@ -69,30 +72,46 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       _error = '';
     });
 
-    final result = await ApiService.verifyOtpAndResetPassword(
-      widget.emailOrPhone,
-      _otp,
-      '', // No password for OTP verification only
-    );
+    final result = await ApiService.verifyOtp(widget.emailOrPhone, _otp);
+    print('OTP verify result: ' + result.toString());
 
     setState(() {
       _loading = false;
     });
 
     if (result == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password reset successful! Please login.")),
-      );
-      Navigator.pushAndRemoveUntil(
+      Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (route) => false,
+        MaterialPageRoute(
+          builder: (_) => SetNewPasswordScreen(
+            emailOrPhone: widget.emailOrPhone,
+            otp: _otp,
+          ),
+        ),
       );
     } else {
+      // If backend returns a list of errors, show the first error message
+      String errorMsg = "OTP verification failed. Please try again.";
+      if (result is List && result.isNotEmpty && result[0]['msg'] != null) {
+        errorMsg = result[0]['msg'];
+      } else if (result is String) {
+        errorMsg = result;
+      }
       setState(() {
-        _error = result ?? "OTP verification failed. Please try again.";
+        _error = errorMsg;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('OTP verify error: ' + errorMsg)),
+      );
     }
+  }
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _otpController = TextEditingController();
+
+  @override
+  void dispose() {
+    _otpController.dispose();
+    super.dispose();
   }
 
   @override
@@ -113,26 +132,31 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                 ),
                 const SizedBox(height: 24),
                 TextFormField(
+                  controller: _otpController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  textAlign: TextAlign.left,
+                  style: const TextStyle(fontSize: 16),
                   decoration: const InputDecoration(
-                    labelText: "OTP",
+                    labelText: 'Enter OTP',
                     border: OutlineInputBorder(),
+                    counterText: '',
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                   ),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "Enter OTP" : null,
-                  onSaved: (v) => _otp = v ?? '',
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Please enter OTP';
+                    if (v.length != 6) return 'OTP must be 6 digits';
+                    return null;
+                  },
+                  onChanged: (_) => setState(() {}),
+                  onFieldSubmitted: (val) {
+                    if (val.length == 6) {
+                      _submitOtp();
+                    }
+                  },
                 ),
-                const SizedBox(height: 24),
-                const SizedBox(height: 24),
-                _loading
-                    ? const CircularProgressIndicator()
-                    : SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _submitOtp,
-                          child: const Text("Reset Password"),
-                        ),
-                      ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 _resending
                     ? const CircularProgressIndicator(strokeWidth: 2)
                     : TextButton(
@@ -141,6 +165,23 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                             ? "Resend OTP"
                             : "Resend OTP in $_secondsLeft s"),
                       ),
+                const SizedBox(height: 24),
+                _loading
+                    ? const CircularProgressIndicator()
+                    : SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: !_loading && _otpController.text.length == 6
+                              ? () async {
+                                  if (_formKey.currentState?.validate() ?? false) {
+                                    await _submitOtp();
+                                  }
+                                }
+                              : null,
+                          child: const Text("Reset Password"),
+                        ),
+                      ),
+                const SizedBox(height: 16),
                 if (_resendMessage.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -161,6 +202,19 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                       style: const TextStyle(color: Colors.red),
                     ),
                   ),
+
+                // Add navigation to LoginScreen
+                const SizedBox(height: 24),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  },
+                  child: const Text('Back to Login'),
+                ),
               ],
             ),
           ),

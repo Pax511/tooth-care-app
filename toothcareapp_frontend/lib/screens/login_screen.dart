@@ -118,7 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 _forgotError = '';
               });
               final result =
-              await ApiService.requestPasswordReset(_forgotField.trim());
+              await ApiService.requestReset(_forgotField.trim());
               setState(() {
                 _forgotLoading = false;
                 if (result == true) {
@@ -134,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 _forgotLoading = true;
                 _forgotError = '';
               });
-              final result = await ApiService.verifyOtpAndResetPassword(
+              final result = await ApiService.resetPassword(
                 _forgotField.trim(),
                 _otp.trim(),
                 _newPassword.trim(),
