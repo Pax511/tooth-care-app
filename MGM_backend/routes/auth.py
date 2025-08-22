@@ -1,3 +1,5 @@
+from MGM_backend.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends
 from typing import Optional
 from pydantic import BaseModel, EmailStr
