@@ -5,6 +5,69 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 
 class ApiService {
+
+  // --------------------------
+  // ✅ Request Signup OTP
+  // --------------------------
+  static Future<dynamic> requestSignupOtp(String emailOrPhone) async {
+    final url = Uri.parse('$baseUrl/auth/request-signup-otp');
+    final Map<String, dynamic> body = {};
+    if (emailOrPhone.contains('@')) {
+      body['email'] = emailOrPhone;
+    } else {
+      body['phone'] = emailOrPhone;
+    }
+    print('REQUEST SIGNUP OTP BODY: ' + jsonEncode(body));
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        try {
+          final res = jsonDecode(response.body);
+          return res['detail'] ?? res['message'] ?? "Failed to send signup OTP. Please try again.";
+        } catch (_) {
+          return "Failed to send signup OTP. Please try again.";
+        }
+      }
+    } catch (_) {
+      return "Network error. Please check your connection and try again.";
+    }
+  }
+
+  // --------------------------
+  // ✅ Verify Signup OTP
+  // --------------------------
+  static Future<dynamic> verifySignupOtp(String emailOrPhone, String otp) async {
+    final url = Uri.parse('$baseUrl/auth/verify-signup-otp');
+    final Map<String, dynamic> body = {};
+    if (emailOrPhone.contains('@')) {
+      body['email'] = emailOrPhone;
+    } else {
+      body['phone'] = emailOrPhone;
+    }
+    body['otp'] = otp;
+    print('VERIFY SIGNUP OTP BODY: ' + jsonEncode(body));
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        final res = jsonDecode(response.body);
+        return res['detail'] ?? res['message'] ?? 'Signup OTP verification failed';
+      }
+    } catch (e) {
+      return 'Signup OTP verification failed: $e';
+    }
+  }
   static const String baseUrl = 'https://tooth-care-app.onrender.com';
 
   // --------------------------

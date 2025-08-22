@@ -8,6 +8,7 @@ import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 import '../auth_callbacks.dart';
 import '../services/api_service.dart';
+import 'signup_otp_verification_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
   final Future<String?> Function(
@@ -253,7 +254,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       return "Invalid DOB";
     }
     _signupDob =
-    "${year.padLeft(4, '0')}-${month.padLeft(2, '0')}-${day.padLeft(2, '0')}";
+        "${year.padLeft(4, '0')}-${month.padLeft(2, '0')}-${day.padLeft(2, '0')}";
 
     if (!_agreedToHipaa) {
       _showErrorDialog("Agreement Required",
@@ -272,46 +273,60 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         _isLoading = true;
       });
       try {
-        final signUpFunction = widget.onSignUp ?? _defaultSignUp;
-        final error = await signUpFunction(
-          context,
-          _signupUsername,
-          _signupPassword,
-          _signupPhone,
-          _signupEmail,
-          _signupName,
-          _signupDob,
-          _signupGender,
-          _toggleForm,
-        );
+        // 1. Register user (do not auto-login)
+        final error = await ApiService.register({
+          'username': _signupUsername,
+          'password': _signupPassword,
+          'phone': _signupPhone,
+          'email': _signupEmail,
+          'name': _signupName,
+          'dob': _signupDob,
+          'gender': _signupGender,
+        });
         if (error == null) {
-          _showErrorDialog("Success",
-              "Signup successful! Please log in with your new credentials.");
-          _signUpFormKey.currentState?.reset();
-          setState(() {
-            _signupUsernameController.clear();
-            _signupPasswordController.clear();
-            _signupPhoneController.clear();
-            _signupEmailController.clear();
-            _signupNameController.clear();
-            _signupUsername = '';
-            _signupPassword = '';
-            _signupPhone = '';
-            _signupEmail = '';
-            _signupName = '';
-            _signupDob = '';
-            _signupGender = 'Male';
-            _agreedToHipaa = false;
-            _usernameError = null;
-            _emailError = null;
-            _phoneError = null;
-            _dobDayController.clear();
-            _dobMonthController.clear();
-            _dobYearController.clear();
-            _dobError = null;
-          });
-          _toggleForm();
-          return null;
+          // 2. Request signup OTP
+          final otpResult = await ApiService.requestSignupOtp(_signupEmail);
+          if (otpResult == true) {
+            // 3. Navigate to OTP verification screen for signup
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SignupOtpVerificationScreen(
+                    email: _signupEmail,
+                  ),
+                ),
+              );
+            }
+            // Reset form state
+            _signUpFormKey.currentState?.reset();
+            setState(() {
+              _signupUsernameController.clear();
+              _signupPasswordController.clear();
+              _signupPhoneController.clear();
+              _signupEmailController.clear();
+              _signupNameController.clear();
+              _signupUsername = '';
+              _signupPassword = '';
+              _signupPhone = '';
+              _signupEmail = '';
+              _signupName = '';
+              _signupDob = '';
+              _signupGender = 'Male';
+              _agreedToHipaa = false;
+              _usernameError = null;
+              _emailError = null;
+              _phoneError = null;
+              _dobDayController.clear();
+              _dobMonthController.clear();
+              _dobYearController.clear();
+              _dobError = null;
+            });
+            return null;
+          } else {
+            _showErrorDialog("OTP Error", otpResult is String ? otpResult : "Failed to send OTP. Please try again.");
+            return otpResult is String ? otpResult : "Failed to send OTP. Please try again.";
+          }
         } else {
           // Try to parse error as JSON for specific fields, fallback to string
           print("Raw error (as received): $error");
@@ -366,6 +381,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     }
     return null;
   }
+
+
 
   Future<String?> _handleLogin() async {
     if (_loginFormKey.currentState?.validate() ?? false) {

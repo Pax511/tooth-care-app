@@ -1,3 +1,84 @@
+# --- Signup OTP Verification ---
+class SignupOtpSchema(BaseModel):
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    otp: str
+
+# Request OTP for signup (after user registers, but before login)
+@router.post("/auth/request-signup-otp")
+async def request_signup_otp(data: RequestResetSchema, db: AsyncSession = Depends(get_db)):
+    target = data.email or data.phone
+    if not target:
+        raise HTTPException(status_code=400, detail="Email or phone required.")
+    # Find user by email or phone (check Patient then Doctor)
+    user = None
+    if data.email:
+        stmt = select(Patient).where(Patient.email == data.email)
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+        if not user:
+            stmt = select(Doctor).where(Doctor.email == data.email)
+            result = await db.execute(stmt)
+            user = result.scalars().first()
+    else:
+        stmt = select(Patient).where(Patient.phone == data.phone)
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+        if not user:
+            stmt = select(Doctor).where(Doctor.phone == data.phone)
+            result = await db.execute(stmt)
+            user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    otp = str(random.randint(100000, 999999))
+    otp_store[target] = otp
+    try:
+        if data.email:
+            from utils import send_mailgun_email
+            send_mailgun_email(data.email, "Your Signup OTP", f"Your signup OTP code is {otp}")
+        else:
+            print(f"Send SMS to {data.phone}: Signup OTP code is {otp}")
+    except Exception as e:
+        print(f"Failed to send signup OTP: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send OTP. Please try again later.")
+    return {"message": "Signup OTP sent"}
+
+# Verify signup OTP and set is_verified=True
+@router.post("/auth/verify-signup-otp")
+async def verify_signup_otp(data: SignupOtpSchema, db: AsyncSession = Depends(get_db)):
+    target = data.email or data.phone
+    if not target:
+        raise HTTPException(status_code=400, detail="Email or phone required.")
+    expected_otp = otp_store.get(target)
+    if not expected_otp or data.otp != expected_otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP.")
+    # Find user (check Patient then Doctor)
+    user = None
+    if data.email:
+        stmt = select(Patient).where(Patient.email == data.email)
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+        if not user:
+            stmt = select(Doctor).where(Doctor.email == data.email)
+            result = await db.execute(stmt)
+            user = result.scalars().first()
+    else:
+        stmt = select(Patient).where(Patient.phone == data.phone)
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+        if not user:
+            stmt = select(Doctor).where(Doctor.phone == data.phone)
+            result = await db.execute(stmt)
+            user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    user.is_verified = True
+    await db.commit()
+    try:
+        del otp_store[target]
+    except Exception as e:
+        print("Error deleting signup OTP:", e)
+    return {"message": "Signup verified"}
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 import random

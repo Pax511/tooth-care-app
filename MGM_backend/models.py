@@ -25,6 +25,7 @@ class Patient(Base):
     procedure_date = Column(Date, nullable=True)
     procedure_time = Column(Time, nullable=True)
     procedure_completed = Column(Boolean, nullable=True, default=None)
+    is_verified = Column(Boolean, default=False, nullable=False)
 
     appointments = relationship("Appointment", back_populates="patient", cascade="all, delete-orphan")
     feedbacks = relationship("Feedback", back_populates="patient", cascade="all, delete-orphan")
@@ -64,6 +65,7 @@ class Doctor(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
+    is_verified = Column(Boolean, default=False, nullable=False)
     appointments = relationship("Appointment", back_populates="doctor", cascade="all, delete-orphan")
     doctor_feedbacks = relationship("DoctorFeedback", back_populates="doctor", cascade="all, delete-orphan")
 
