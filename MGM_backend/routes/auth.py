@@ -4,8 +4,8 @@ from sqlalchemy import select
 from typing import Optional
 from pydantic import BaseModel, EmailStr
 import random
-from ..database import get_db
-from ..models import Patient, Doctor
+from database import get_db
+from models import Patient, Doctor
 
 # In-memory store for OTPs (for demo; use DB or cache for production)
 otp_store = {}
