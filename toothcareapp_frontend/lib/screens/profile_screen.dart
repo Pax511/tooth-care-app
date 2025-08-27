@@ -175,7 +175,7 @@ class ProfileScreen extends StatelessWidget {
                           _infoTile(Icons.person, 'Gender', gender, Colors.blue[50]!),
                           _infoTile(Icons.account_circle, 'Username', username, Colors.blue[50]!),
                           _infoTile(Icons.phone, 'Phone', phone, Colors.blue[50]!),
-                          _infoTile(Icons.email, 'Email', email, Colors.blue[50]!),
+                          _infoTile(Icons.email, 'Email', email, Colors.blue[50]!, isEmail: true),
                           const SizedBox(height: 16),
                           _infoTile(
                             Icons.calendar_today,
@@ -315,19 +315,30 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  static Widget _infoTile(IconData icon, String label, String value, Color color) {
+  static Widget _infoTile(IconData icon, String label, String value, Color color, {bool isEmail = false}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
       child: Row(
+        crossAxisAlignment: isEmail ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           Icon(icon, color: Colors.blueGrey[700], size: 22),
           const SizedBox(width: 12),
           Expanded(
-              child: Text(label,
-                  style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500, fontSize: 15))),
-          Text(value, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 15)),
+            child: Text(label,
+                style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500, fontSize: 15)),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 15),
+              overflow: TextOverflow.visible,
+              softWrap: true,
+              textAlign: TextAlign.right,
+            ),
+          ),
         ],
       ),
     );
@@ -361,26 +372,28 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text("Dental Office",
+                children: [
+                  const Text("Dental Office",
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.redAccent,
                           fontSize: 16)),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Row(
-                    children: [
+                    children: const [
                       Icon(Icons.phone, size: 18, color: Colors.redAccent),
                       SizedBox(width: 6),
-                      Text("(555) 123-4567", style: TextStyle(fontSize: 15)),
+                      // Not const because of TextStyle
+                      Text("022-27433404 , 022-27437992", style: TextStyle(fontSize: 15)),
                     ],
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Row(
-                    children: [
+                    children: const [
                       Icon(Icons.email, size: 18, color: Colors.redAccent),
                       SizedBox(width: 6),
-                      Text("emergency@dentalcare.com", style: TextStyle(fontSize: 15)),
+                      // Not const because of TextStyle
+                      Text("mgmmcnb@gmail.com", style: TextStyle(fontSize: 15)),
                     ],
                   ),
                 ],

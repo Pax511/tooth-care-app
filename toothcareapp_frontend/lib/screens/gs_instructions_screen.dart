@@ -114,9 +114,12 @@ class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
         .setChecklistForKey(_generalChecklistKey(currentDay), _dosChecked);
 
     final appState = Provider.of<AppState>(context, listen: false);
+    final procedureDate = widget.date ?? DateTime.now();
+    final logDate = procedureDate.add(Duration(days: currentDay - 1));
+    final logDateStr = "${logDate.year.toString().padLeft(4, '0')}-${logDate.month.toString().padLeft(2, '0')}-${logDate.day.toString().padLeft(2, '0')}";
     appState.addInstructionLog(
       gsDos[idx][selectedLang]!,
-      date: DateTime.now().toIso8601String().split('T')[0],
+      date: logDateStr,
       type: 'general',
       followed: _dosChecked[idx],
       username: appState.username,
@@ -133,9 +136,12 @@ class _GSInstructionsScreenState extends State<GSInstructionsScreen> {
         .setChecklistForKey(_specificChecklistKey(currentDay), _specificChecked);
 
     final appState = Provider.of<AppState>(context, listen: false);
+    final procedureDate = widget.date ?? DateTime.now();
+    final logDate = procedureDate.add(Duration(days: currentDay - 1));
+    final logDateStr = "${logDate.year.toString().padLeft(4, '0')}-${logDate.month.toString().padLeft(2, '0')}-${logDate.day.toString().padLeft(2, '0')}";
     appState.addInstructionLog(
       gsSpecificInstructions[idx][selectedLang]!,
-      date: DateTime.now().toIso8601String().split('T')[0],
+      date: logDateStr,
       type: 'specific',
       followed: _specificChecked[idx],
       username: appState.username,

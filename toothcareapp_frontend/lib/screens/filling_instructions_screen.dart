@@ -115,9 +115,14 @@ class _FillingInstructionsScreenState extends State<FillingInstructionsScreen> {
         .setChecklistForKey(_generalChecklistKey(currentDay), _dosChecked);
 
     final appState = Provider.of<AppState>(context, listen: false);
+    // Calculate the correct date for the day being checked
+    final procedureDate = appState.procedureDate != null
+        ? DateTime(appState.procedureDate!.year, appState.procedureDate!.month, appState.procedureDate!.day)
+        : DateTime.now();
+    final logDate = procedureDate.add(Duration(days: currentDay - 1));
     appState.addInstructionLog(
       dosList[idx][selectedLang]!,
-      date: DateTime.now().toIso8601String().split('T')[0],
+      date: logDate.toIso8601String().split('T')[0],
       type: "general",
       followed: value,
       username: appState.username,
@@ -134,9 +139,14 @@ class _FillingInstructionsScreenState extends State<FillingInstructionsScreen> {
         .setChecklistForKey(_specificChecklistKey(currentDay), _specificChecked);
 
     final appState = Provider.of<AppState>(context, listen: false);
+    // Calculate the correct date for the day being checked
+    final procedureDate = appState.procedureDate != null
+        ? DateTime(appState.procedureDate!.year, appState.procedureDate!.month, appState.procedureDate!.day)
+        : DateTime.now();
+    final logDate = procedureDate.add(Duration(days: currentDay - 1));
     appState.addInstructionLog(
       specificSteps[idx][selectedLang]!,
-      date: DateTime.now().toIso8601String().split('T')[0],
+      date: logDate.toIso8601String().split('T')[0],
       type: "specific",
       followed: value,
       username: appState.username,

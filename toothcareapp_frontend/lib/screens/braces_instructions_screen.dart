@@ -110,9 +110,15 @@ class _BracesInstructionsScreenState extends State<BracesInstructionsScreen> {
         .setChecklistForKey(_generalChecklistKey(currentDay), _dosChecked);
 
     final appState = Provider.of<AppState>(context, listen: false);
+    // Save log for the actual day being viewed, not just today
+    final procedureDate = widget.date != null
+        ? DateTime(widget.date!.year, widget.date!.month, widget.date!.day)
+        : DateTime.now();
+    final logDate = procedureDate.add(Duration(days: currentDay - 1));
+    final logDateStr = "${logDate.year.toString().padLeft(4, '0')}-${logDate.month.toString().padLeft(2, '0')}-${logDate.day.toString().padLeft(2, '0')}";
     appState.addInstructionLog(
       bracesDos[idx][selectedLang]!,
-      date: DateTime.now().toIso8601String().split('T')[0],
+      date: logDateStr,
       type: 'general',
       followed: _dosChecked[idx],
       username: appState.username,
@@ -129,9 +135,15 @@ class _BracesInstructionsScreenState extends State<BracesInstructionsScreen> {
         .setChecklistForKey(_specificChecklistKey(currentDay), _specificChecked);
 
     final appState = Provider.of<AppState>(context, listen: false);
+    // Save log for the actual day being viewed, not just today
+    final procedureDate = widget.date != null
+        ? DateTime(widget.date!.year, widget.date!.month, widget.date!.day)
+        : DateTime.now();
+    final logDate = procedureDate.add(Duration(days: currentDay - 1));
+    final logDateStr = "${logDate.year.toString().padLeft(4, '0')}-${logDate.month.toString().padLeft(2, '0')}-${logDate.day.toString().padLeft(2, '0')}";
     appState.addInstructionLog(
       bracesSpecificInstructions[idx][selectedLang]!,
-      date: DateTime.now().toIso8601String().split('T')[0],
+      date: logDateStr,
       type: "specific",
       followed: value,
       username: appState.username,

@@ -109,9 +109,12 @@ class _ISSInstructionsScreenState extends State<ISSInstructionsScreen> {
         .setChecklistForKey(_generalChecklistKey(currentDay), _dosChecked);
 
     final appState = Provider.of<AppState>(context, listen: false);
+    // Calculate the correct date for the day being checked
+    final procedureDate = DateTime(widget.date.year, widget.date.month, widget.date.day);
+    final logDate = procedureDate.add(Duration(days: currentDay - 1));
     appState.addInstructionLog(
       doList[idx][selectedLang]!,
-      date: DateTime.now().toIso8601String().split('T')[0],
+      date: logDate.toIso8601String().split('T')[0],
       type: 'general',
       followed: _dosChecked[idx],
       username: appState.username,
@@ -128,9 +131,12 @@ class _ISSInstructionsScreenState extends State<ISSInstructionsScreen> {
         .setChecklistForKey(_specificChecklistKey(currentDay), _specificChecked);
 
     final appState = Provider.of<AppState>(context, listen: false);
+    // Calculate the correct date for the day being checked
+    final procedureDate = DateTime(widget.date.year, widget.date.month, widget.date.day);
+    final logDate = procedureDate.add(Duration(days: currentDay - 1));
     appState.addInstructionLog(
       specificInstructions[idx][selectedLang]!,
-      date: DateTime.now().toIso8601String().split('T')[0],
+      date: logDate.toIso8601String().split('T')[0],
       type: 'specific',
       followed: _specificChecked[idx],
       username: appState.username,
