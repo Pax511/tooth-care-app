@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'app_state.dart';
 import 'services/api_service.dart';
 import 'screens/welcome_screen.dart';
@@ -10,15 +9,19 @@ import 'screens/home_screen.dart';
 import 'screens/treatment_screen.dart';
 import 'screens/pfd_instructions_screen.dart';
 import 'screens/prd_instructions_screen.dart';
-import '../auth_callbacks.dart';
+import 'auth_callbacks.dart';
+
+// Add RouteObserver for navigation events (must be after all imports)
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final appState = AppState();
   await appState.syncTokenFromPrefs();       // <-- Ensure token is loaded!
-  await appState.loadInstructionLogs();
-  await appState.loadUserDetails();
+  await appState.loadUserDetails();          // Load user details (includes username)
+  await appState.loadAllChecklists(username: appState.username); // Load persisted checklists for user
+  await appState.loadInstructionLogs(username: appState.username); // Load user-scoped logs
 
   // Debug: Print token value on startup
   print('Token on startup: ${appState.token}');
@@ -52,6 +55,7 @@ class ToothCareGuideApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
+      navigatorObservers: [routeObserver],
       onGenerateRoute: (settings) {
         if (settings.name == '/instructions') {
           final args = settings.arguments as Map<String, dynamic>;
@@ -110,18 +114,18 @@ class _AppEntryGateState extends State<AppEntryGate> {
           appState.procedureTime != null &&
           appState.procedureCompleted == false) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Fixed') {
+      if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Fixed') {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (_) => PFDInstructionsScreen(date: appState.procedureDate!),
+        builder: (_) => PFDInstructionsScreen(date: DateTime.now()),
               ),
             );
           } else if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Removable') {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (_) => PRDInstructionsScreen(date: appState.procedureDate!),
+        builder: (_) => PRDInstructionsScreen(date: DateTime.now()),
               ),
             );
           } else {
@@ -184,6 +188,9 @@ class _AppEntryGateState extends State<AppEntryGate> {
       phone: userDetails['phone'],
       email: userDetails['email'],
     );
+  // Load persisted data for this user
+  await appState.loadAllChecklists(username: appState.username);
+  await appState.loadInstructionLogs(username: appState.username);
     appState.setDepartment(userDetails['department']);
     appState.setDoctor(userDetails['doctor']);
     appState.setTreatment(userDetails['treatment'], subtype: userDetails['treatment_subtype']);
@@ -201,18 +208,18 @@ class _AppEntryGateState extends State<AppEntryGate> {
         appState.procedureTime != null &&
         appState.procedureCompleted == false) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Fixed') {
+    if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Fixed') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => PFDInstructionsScreen(date: appState.procedureDate!),
+      builder: (_) => PFDInstructionsScreen(date: DateTime.now()),
             ),
           );
         } else if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Removable') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => PRDInstructionsScreen(date: appState.procedureDate!),
+      builder: (_) => PRDInstructionsScreen(date: DateTime.now()),
             ),
           );
         } else {
@@ -311,7 +318,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
           String password,
           ) async {
         print('Attempting login...');
-        final error = await ApiService.login(username, password);
+  final error = await ApiService.login(username.trim(), password);
         print('Login response: $error');
 
         if (error != null) {
@@ -343,6 +350,9 @@ class _AppEntryGateState extends State<AppEntryGate> {
               phone: userDetails['phone'],
               email: userDetails['email'],
             );
+            // Load persisted data for this user
+            await appState.loadAllChecklists(username: appState.username);
+            await appState.loadInstructionLogs(username: appState.username);
             appState.setDepartment(userDetails['department']);
             appState.setDoctor(userDetails['doctor']);
             appState.setTreatment(userDetails['treatment'], subtype: userDetails['treatment_subtype']);
@@ -361,18 +371,18 @@ class _AppEntryGateState extends State<AppEntryGate> {
                 appState.procedureDate != null &&
                 appState.procedureTime != null &&
                 appState.procedureCompleted == false) {
-              if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Fixed') {
+      if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Fixed') {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => PFDInstructionsScreen(date: appState.procedureDate!),
+        builder: (_) => PFDInstructionsScreen(date: DateTime.now()),
                   ),
                 );
               } else if (appState.treatment == 'Prosthesis' && appState.treatmentSubtype == 'Removable') {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => PRDInstructionsScreen(date: appState.procedureDate!),
+        builder: (_) => PRDInstructionsScreen(date: DateTime.now()),
                   ),
                 );
               } else {

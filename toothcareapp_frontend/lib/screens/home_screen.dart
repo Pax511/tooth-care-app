@@ -67,46 +67,47 @@ class _HomeScreenState extends State<HomeScreen> {
     final appState = Provider.of<AppState>(context, listen: false);
     final String? treatment = appState.treatment;
     final String? subtype = appState.treatmentSubtype;
+    final DateTime today = DateTime.now();
 
     if (treatment == "Tooth Taken Out") {
-      return TTOInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+      return TTOInstructionsScreen(date: today);
     }
     if (treatment == "Prosthesis Fitted") {
       if (subtype == "Fixed Dentures") {
-        return PFDInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+        return PFDInstructionsScreen(date: today);
       } else if (subtype == "Removable Dentures") {
-        return PRDInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+        return PRDInstructionsScreen(date: today);
       }
     }
     if (treatment == "Root Canal/Filling") {
-      return RootCanalInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+      return RootCanalInstructionsScreen(date: today);
     }
     if (treatment == "Implant") {
       if (subtype == "First Stage") {
-        return IFSInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+        return IFSInstructionsScreen(date: today);
       } else if (subtype == "Second Stage") {
-        return ISSInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+        return ISSInstructionsScreen(date: today);
       }
     }
 
     if (treatment == "Braces") {
-      return BracesInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+      return BracesInstructionsScreen(date: today);
     }
     if (treatment == "Tooth Fracture") {
       if (subtype == "Filling") {
-        return FillingInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+        return FillingInstructionsScreen(date: today);
       }
       else if (subtype == "Teeth Cleaning") {
-        return TCInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+        return TCInstructionsScreen(date: today);
       }
       else if (subtype == "Teeth Whitening") {
-        return TWInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+        return TWInstructionsScreen(date: today);
       }
       else if (subtype == "Gum Surgery") {
-        return GSInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+        return GSInstructionsScreen(date: today);
       }
       else if (subtype == "Veneers/Laminates") {
-        return VLInstructionsScreen(date: Provider.of<AppState>(context, listen: false).procedureDate!);
+        return VLInstructionsScreen(date: today);
       }
       return const _NoInstructionsSelected();
     }
@@ -421,10 +422,14 @@ class HomeMainContent extends StatelessWidget {
                       children: [
                         const Icon(Icons.person, color: Colors.blue),
                         const SizedBox(width: 8),
-                        Text(
-                          'Hello, $name!',
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold),
+                        Expanded(
+                          child: Text(
+                            'Hello, $name!',
+                            style: const TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
                         ),
                       ],
                     ),
@@ -435,10 +440,14 @@ class HomeMainContent extends StatelessWidget {
                     children: [
                       const Icon(Icons.local_hospital, color: Colors.indigo),
                       const SizedBox(width: 8),
-                      Text(
-                        "Department: $department",
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w500, fontSize: 16),
+                      Expanded(
+                        child: Text(
+                          "Department: $department",
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w500, fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
                     ],
                   ),
@@ -450,10 +459,14 @@ class HomeMainContent extends StatelessWidget {
                       children: [
                         const Icon(Icons.medical_services, color: Colors.teal),
                         const SizedBox(width: 8),
-                        Text(
-                          "Doctor: $doctor",
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w500, fontSize: 16),
+                        Expanded(
+                          child: Text(
+                            "Doctor: $doctor",
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w500, fontSize: 16),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
                         ),
                       ],
                     ),
@@ -465,10 +478,19 @@ class HomeMainContent extends StatelessWidget {
                       children: [
                         const Icon(Icons.healing, color: Colors.deepOrange),
                         const SizedBox(width: 8),
-                        Text(
-                          "Treatment: $treatment${(subtype != null && subtype.isNotEmpty) ? " ($subtype)" : ""}",
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w500, fontSize: 16),
+                        Expanded(
+                          child: Tooltip(
+                            message:
+                                "Treatment: $treatment${(subtype != null && subtype.isNotEmpty) ? " ($subtype)" : ""}",
+                            child: Text(
+                              "Treatment: $treatment${(subtype != null && subtype.isNotEmpty) ? " ($subtype)" : ""}",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w500, fontSize: 16),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              softWrap: false,
+                            ),
+                          ),
                         ),
                       ],
                     ),

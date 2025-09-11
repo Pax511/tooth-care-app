@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../app_state.dart';
 import '../services/api_service.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../main.dart'; // Import for global routeObserver
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -13,7 +15,7 @@ class ProgressScreen extends StatefulWidget {
   State<ProgressScreen> createState() => _ProgressScreenState();
 }
 
-class _ProgressScreenState extends State<ProgressScreen> {
+class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
   bool _loading = false;
   String _selectedDateForInstructionsLog = "";
 
@@ -24,10 +26,35 @@ class _ProgressScreenState extends State<ProgressScreen> {
   String? get _subtype =>
       Provider.of<AppState>(context, listen: false).treatmentSubtype;
 
+
   @override
   void initState() {
     super.initState();
     // Always use a valid username
+    final username = _username.isNotEmpty ? _username : 'default';
+    _initializeProgress(username);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe to route changes using the global routeObserver
+    final modalRoute = ModalRoute.of(context);
+    if (modalRoute is PageRoute) {
+      routeObserver.subscribe(this, modalRoute);
+    }
+  }
+
+  @override
+  void dispose() {
+    // Unsubscribe from route changes using the global routeObserver
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when coming back to this screen
     final username = _username.isNotEmpty ? _username : 'default';
     _initializeProgress(username);
   }
@@ -202,6 +229,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Widget _buildInstructionsFollowedBox(List<dynamic> instructionLogs) {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final procedureDate = appState.procedureDate;
+    if (procedureDate == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        child: const Text("Please set up your treatment and procedure date first."),
+      );
+    }
+
     final filteredLogs = _filterInstructionLogs(
       instructionLogs,
       username: _username,
@@ -212,44 +248,23 @@ class _ProgressScreenState extends State<ProgressScreen> {
         .where((log) => log['followed'] == true || log['followed']?.toString() == 'true')
         .toList();
 
-    final List<String> uniqueDates = latestLogs
-        .map((log) => log['date']?.toString() ?? '')
-        .toSet()
-        .where((d) => d.isNotEmpty)
-        .toList();
+    final today = DateTime.now();
+    final int days = today.difference(DateTime(procedureDate.year, procedureDate.month, procedureDate.day)).inDays + 1;
+    final List<String> allDates = List.generate(days, (i) {
+      final d = procedureDate.add(Duration(days: i));
+      return "${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+    });
 
-    // Default to today's date if available, otherwise pick first
-    if (_selectedDateForInstructionsLog.isEmpty && uniqueDates.isNotEmpty) {
-      _selectedDateForInstructionsLog = uniqueDates.contains(_getTodayDate())
+    if (_selectedDateForInstructionsLog.isEmpty && allDates.isNotEmpty) {
+      _selectedDateForInstructionsLog = allDates.contains(_getTodayDate())
           ? _getTodayDate()
-          : uniqueDates.first;
+          : allDates.last;
     }
 
     final logsForSelectedDate = latestLogs
         .where((log) => log['date']?.toString() == _selectedDateForInstructionsLog)
         .toList();
 
-    // If nothing, show a message
-    if (latestLogs.isEmpty) {
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFF),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.blueGrey[100]!),
-        ),
-        child: const Center(
-          child: Text(
-            "No instructions followed yet.",
-            style: TextStyle(color: Colors.black54, fontSize: 15),
-          ),
-        ),
-      );
-    }
-
-    // --- FIXED ROW OVERFLOW ---
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
@@ -273,14 +288,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       "Instructions Log",
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 16, // original size restored
+                        fontSize: 16,
                         color: Colors.blueGrey,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (uniqueDates.length > 1) ...[
+                  if (allDates.length > 1) ...[
                     const SizedBox(width: 8),
                     ConstrainedBox(
                       constraints: BoxConstraints(
@@ -291,7 +306,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         value: _selectedDateForInstructionsLog,
                         isDense: true,
                         isExpanded: true,
-                        items: uniqueDates
+                        items: allDates
                             .map((d) => DropdownMenuItem(
                             value: d,
                             child: Text(
@@ -315,54 +330,67 @@ class _ProgressScreenState extends State<ProgressScreen> {
             },
           ),
           const SizedBox(height: 10),
-          ...logsForSelectedDate.map((log) {
-            final date = log['date']?.toString() ?? '';
-            final instruction = log['instruction']?.toString() ?? log['note']?.toString() ?? '';
-            final type = log['type']?.toString().toLowerCase();
-            final color = type == "general"
-                ? Colors.green[100]
-                : type == "specific"
-                ? Colors.red[100]
-                : Colors.blue[100];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      instruction,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 15, // original size restored
-                        color: Colors.black87,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _formatDisplayDate(date),
-                      style: const TextStyle(
-                          color: Colors.black54,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13),
-                    ),
-                  ),
-                ],
+          if (logsForSelectedDate.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.yellow[50],
+                borderRadius: BorderRadius.circular(8),
               ),
-            );
-          }).toList(),
+              child: const Text(
+                "No instructions followed for this day.",
+                style: TextStyle(color: Colors.black54, fontSize: 15),
+              ),
+            )
+          else
+            ...logsForSelectedDate.map((log) {
+              final date = log['date']?.toString() ?? '';
+              final instruction = log['instruction']?.toString() ?? log['note']?.toString() ?? '';
+              final type = log['type']?.toString().toLowerCase();
+              final color = type == "general"
+                  ? Colors.green[100]
+                  : type == "specific"
+                  ? Colors.red[100]
+                  : Colors.blue[100];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        instruction,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _formatDisplayDate(date),
+                        style: const TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
         ],
       ),
     );
-    // --- END FIX ---
   }
 
   String _getTodayDate() {

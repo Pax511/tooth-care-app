@@ -269,9 +269,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       labelText: "Username",
                       border: OutlineInputBorder(),
                     ),
-                    validator: (v) =>
-                    v == null || v.isEmpty ? "Enter username" : null,
-                    onSaved: (v) => _username = v ?? '',
+          validator: (v) =>
+            v == null || v.trim().isEmpty ? "Enter username" : null,
+          onSaved: (v) => _username = (v ?? '').trim(),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -280,9 +280,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       border: OutlineInputBorder(),
                     ),
                     obscureText: true,
-                    validator: (v) =>
-                    v == null || v.isEmpty ? "Enter password" : null,
-                    onSaved: (v) => _password = v ?? '',
+          validator: (v) =>
+            v == null || v.isEmpty ? "Enter password" : null,
+          onSaved: (v) => _password = (v ?? ''),
                   ),
                   const SizedBox(height: 24),
                   // ------------- BUTTONS ROW (100% working) -------------

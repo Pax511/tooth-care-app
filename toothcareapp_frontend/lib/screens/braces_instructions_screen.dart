@@ -13,6 +13,37 @@ class BracesInstructionsScreen extends StatefulWidget {
 }
 
 class _BracesInstructionsScreenState extends State<BracesInstructionsScreen> {
+  void _saveAllLogsForDay() {
+    // Always use the selected date (widget.date) for log saving
+    final procedureDate = widget.date != null
+        ? DateTime(widget.date!.year, widget.date!.month, widget.date!.day)
+        : DateTime.now();
+    final logDate = procedureDate;
+    final logDateStr = "${logDate.year.toString().padLeft(4, '0')}-${logDate.month.toString().padLeft(2, '0')}-${logDate.day.toString().padLeft(2, '0')}";
+    final appState = Provider.of<AppState>(context, listen: false);
+    for (int i = 0; i < bracesDos.length; i++) {
+      appState.addInstructionLog(
+        bracesDos[i][selectedLang] ?? '',
+        date: logDateStr,
+        type: 'general',
+        followed: _dosChecked.length > i ? _dosChecked[i] : false,
+        username: appState.username,
+        treatment: appState.treatment,
+        subtype: appState.treatmentSubtype,
+      );
+    }
+    for (int i = 0; i < bracesSpecificInstructions.length; i++) {
+      appState.addInstructionLog(
+        bracesSpecificInstructions[i][selectedLang] ?? '',
+        date: logDateStr,
+        type: 'specific',
+        followed: _specificChecked.length > i ? _specificChecked[i] : false,
+        username: appState.username,
+        treatment: appState.treatment,
+        subtype: appState.treatmentSubtype,
+      );
+    }
+  }
   String selectedLang = 'en'; // 'en' for English, 'mr' for Marathi
 
   static const List<Map<String, String>> bracesDos = [
@@ -67,89 +98,70 @@ class _BracesInstructionsScreenState extends State<BracesInstructionsScreen> {
   late List<bool> _specificChecked;
   bool showSpecific = false;
 
-  String _generalChecklistKey(int day) => "braces_dos_day$day";
-  String _specificChecklistKey(int day) => "braces_specific_day$day";
+  String _generalChecklistKey(DateTime date) => "braces_dos_${date.year}_${date.month}_${date.day}";
+  String _specificChecklistKey(DateTime date) => "braces_specific_${date.year}_${date.month}_${date.day}";
 
   @override
   void initState() {
     super.initState();
 
-    final now = DateTime.now();
-    final procedureDate = widget.date != null
-        ? DateTime(widget.date!.year, widget.date!.month, widget.date!.day)
-        : DateTime.now();
-    int day = now.difference(procedureDate).inDays + 1;
-    if (day < 1) day = 1;
-    if (day > totalDays) day = totalDays;
-    currentDay = day;
+  final selectedDate = widget.date != null
+    ? DateTime(widget.date!.year, widget.date!.month, widget.date!.day)
+    : DateTime.now();
+  final appState = Provider.of<AppState>(context, listen: false);
+  final proc = appState.procedureDate;
+  final DateTime procedureDate = proc != null
+    ? DateTime(proc.year, proc.month, proc.day)
+    : selectedDate;
+  int day = selectedDate.difference(procedureDate).inDays + 1;
+  if (day < 1) day = 1;
+  if (day > totalDays) day = totalDays;
+  currentDay = day;
 
-    final appState = Provider.of<AppState>(context, listen: false);
-
-    _dosChecked = List<bool>.from(appState.getChecklistForKey(_generalChecklistKey(currentDay)));
+  _dosChecked = List<bool>.from(appState.getChecklistForKey(_generalChecklistKey(selectedDate)));
     if (_dosChecked.length != bracesDos.length) {
       _dosChecked = List.filled(bracesDos.length, false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        appState.setChecklistForKey(_generalChecklistKey(currentDay), _dosChecked);
+        appState.setChecklistForKey(_generalChecklistKey(selectedDate), _dosChecked);
       });
     }
 
-    _specificChecked = List<bool>.from(appState.getChecklistForKey(_specificChecklistKey(currentDay)));
+  _specificChecked = List<bool>.from(appState.getChecklistForKey(_specificChecklistKey(selectedDate)));
     if (_specificChecked.length != bracesSpecificInstructions.length) {
       _specificChecked = List.filled(bracesSpecificInstructions.length, false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        appState.setChecklistForKey(_specificChecklistKey(currentDay), _specificChecked);
+        appState.setChecklistForKey(_specificChecklistKey(selectedDate), _specificChecked);
       });
     }
+
+  // Save logs for all instructions for the selected day on load
+  _saveAllLogsForDay();
   }
 
   void _updateDos(int idx, bool? value) {
     setState(() {
       _dosChecked[idx] = value ?? false;
     });
-    Provider.of<AppState>(context, listen: false)
-        .setChecklistForKey(_generalChecklistKey(currentDay), _dosChecked);
+  final selectedDate = widget.date != null
+    ? DateTime(widget.date!.year, widget.date!.month, widget.date!.day)
+    : DateTime.now();
+  Provider.of<AppState>(context, listen: false)
+    .setChecklistForKey(_generalChecklistKey(selectedDate), _dosChecked);
 
-    final appState = Provider.of<AppState>(context, listen: false);
-    // Save log for the actual day being viewed, not just today
-    final procedureDate = widget.date != null
-        ? DateTime(widget.date!.year, widget.date!.month, widget.date!.day)
-        : DateTime.now();
-    final logDate = procedureDate.add(Duration(days: currentDay - 1));
-    final logDateStr = "${logDate.year.toString().padLeft(4, '0')}-${logDate.month.toString().padLeft(2, '0')}-${logDate.day.toString().padLeft(2, '0')}";
-    appState.addInstructionLog(
-      bracesDos[idx][selectedLang]!,
-      date: logDateStr,
-      type: 'general',
-      followed: _dosChecked[idx],
-      username: appState.username,
-      treatment: appState.treatment,
-      subtype: appState.treatmentSubtype,
-    );
+  _saveAllLogsForDay();
   }
 
   void _updateSpecificChecklist(int idx, bool value) {
     setState(() {
       _specificChecked[idx] = value;
     });
-    Provider.of<AppState>(context, listen: false)
-        .setChecklistForKey(_specificChecklistKey(currentDay), _specificChecked);
+  final selectedDate = widget.date != null
+    ? DateTime(widget.date!.year, widget.date!.month, widget.date!.day)
+    : DateTime.now();
+  Provider.of<AppState>(context, listen: false)
+    .setChecklistForKey(_specificChecklistKey(selectedDate), _specificChecked);
 
-    final appState = Provider.of<AppState>(context, listen: false);
-    // Save log for the actual day being viewed, not just today
-    final procedureDate = widget.date != null
-        ? DateTime(widget.date!.year, widget.date!.month, widget.date!.day)
-        : DateTime.now();
-    final logDate = procedureDate.add(Duration(days: currentDay - 1));
-    final logDateStr = "${logDate.year.toString().padLeft(4, '0')}-${logDate.month.toString().padLeft(2, '0')}-${logDate.day.toString().padLeft(2, '0')}";
-    appState.addInstructionLog(
-      bracesSpecificInstructions[idx][selectedLang]!,
-      date: logDateStr,
-      type: "specific",
-      followed: value,
-      username: appState.username,
-      treatment: appState.treatment,
-      subtype: appState.treatmentSubtype,
-    );
+  _saveAllLogsForDay();
   }
 
   @override

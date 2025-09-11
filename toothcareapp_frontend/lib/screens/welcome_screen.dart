@@ -264,28 +264,28 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     if (_signUpFormKey.currentState?.validate() ?? false) {
   _signUpFormKey.currentState!.save();
   // Get values from controllers for actual signup data
-  _signupUsername = _signupUsernameController.text;
+  _signupUsername = _signupUsernameController.text.trim();
   _signupPassword = _signupPasswordController.text;
   _signupPhone = _signupPhoneController.text;
-  _signupEmail = _signupEmailController.text;
-  _signupName = _signupNameController.text;
+  _signupEmail = _signupEmailController.text.trim();
+  _signupName = _signupNameController.text.trim();
       setState(() {
         _isLoading = true;
       });
       try {
         // 1. Register user (do not auto-login)
         final error = await ApiService.register({
-          'username': _signupUsernameController.text,
+          'username': _signupUsernameController.text.trim(),
           'password': _signupPasswordController.text,
           'phone': _signupPhoneController.text,
-          'email': _signupEmailController.text,
-          'name': _signupNameController.text,
+          'email': _signupEmailController.text.trim(),
+          'name': _signupNameController.text.trim(),
           'dob': _signupDob,
           'gender': _signupGender,
         });
         if (error == null) {
           // 2. Request signup OTP
-          final otpEmail = _signupEmailController.text;
+          final otpEmail = _signupEmailController.text.trim();
           print('DEBUG: Email before OTP request: ' + otpEmail);
           final otpResult = await ApiService.requestSignupOtp(otpEmail);
           print('DEBUG: Email before guard clause: ' + otpEmail);
@@ -396,12 +396,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Future<String?> _handleLogin() async {
     if (_loginFormKey.currentState?.validate() ?? false) {
       _loginFormKey.currentState!.save();
+    // Normalize inputs
+    _loginUsername = _loginUsername.trim();
       setState(() => _isLoading = true);
       try {
         final loginFunction = widget.onLogin ?? _defaultLogin;
         final error = await loginFunction(
           context,
-          _loginUsername,
+      _loginUsername.trim(),
           _loginPassword,
         );
         if (error == null) {
@@ -582,7 +584,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               labelText: "Full Name",
               border: OutlineInputBorder(),
             ),
-            validator: (v) => v == null || v.isEmpty ? "Enter full name" : null,
+            validator: (v) => v == null || v.trim().isEmpty ? "Enter full name" : null,
             onSaved: (v) => _signupName = v ?? '',
           ),
           const SizedBox(height: 16),
@@ -610,8 +612,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               border: const OutlineInputBorder(),
               errorText: _usernameError,
             ),
-            validator: (v) => v == null || v.isEmpty ? "Enter username" : null,
-            onSaved: (v) => _signupUsername = v ?? '',
+            validator: (v) => v == null || v.trim().isEmpty ? "Enter username" : null,
+            onSaved: (v) => _signupUsername = (v ?? '').trim(),
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -638,8 +640,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             ),
             keyboardType: TextInputType.phone,
             validator: (v) {
-              if (v == null || v.isEmpty) return "Enter phone number";
-              if (!RegExp(r'^\d{10}$').hasMatch(v)) {
+              final t = (v ?? '').trim();
+              if (t.isEmpty) return "Enter phone number";
+              if (!RegExp(r'^\d{10}$').hasMatch(t)) {
                 return "Enter valid 10-digit phone number";
               }
               return null;
@@ -656,8 +659,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             ),
             keyboardType: TextInputType.emailAddress,
             validator: (v) {
-              if (v == null || v.isEmpty) return "Enter email address";
-              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w]{2,4}$').hasMatch(v)) {
+              final t = (v ?? '').trim();
+              if (t.isEmpty) return "Enter email address";
+              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w]{2,4}$').hasMatch(t)) {
                 return "Enter valid email address";
               }
               return null;
@@ -762,8 +766,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               labelText: "Username",
               border: OutlineInputBorder(),
             ),
-            validator: (v) => v == null || v.isEmpty ? "Enter username" : null,
-            onSaved: (v) => _loginUsername = v ?? '',
+            validator: (v) => v == null || v.trim().isEmpty ? "Enter username" : null,
+            onSaved: (v) => _loginUsername = (v ?? '').trim(),
           ),
           const SizedBox(height: 16),
           TextFormField(

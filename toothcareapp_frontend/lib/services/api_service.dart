@@ -68,13 +68,13 @@ class ApiService {
       return 'Signup OTP verification failed: $e';
     }
   }
-  static const String baseUrl = 'https://tooth-care-app.onrender.com';
+  static const String baseUrl = 'https://paras-backend-0gwt.onrender.com';
 
   // --------------------------
   // ✅ Step 1: Verify OTP Only (no password reset)
   // --------------------------
   static Future<dynamic> verifyOtp(String emailOrPhone, String otp) async {
-    final url = Uri.parse('https://tooth-care-app.onrender.com/auth/verify-otp');
+  final url = Uri.parse('https://paras-backend-0gwt.onrender.com/auth/verify-otp');
     final Map<String, dynamic> body = {};
     if (emailOrPhone.contains('@')) {
       body['email'] = emailOrPhone;
@@ -104,7 +104,7 @@ class ApiService {
   // ✅ Step 2: Reset Password (requires OTP)
   // --------------------------
   static Future<dynamic> resetPassword(String emailOrPhone, String otp, String newPassword) async {
-    final url = Uri.parse('https://tooth-care-app.onrender.com/auth/reset-password');
+  final url = Uri.parse('https://paras-backend-0gwt.onrender.com/auth/reset-password');
     final Map<String, dynamic> body = {};
     if (emailOrPhone.contains('@')) {
       body['email'] = emailOrPhone;
@@ -169,10 +169,17 @@ class ApiService {
   // --------------------------
   static Future<String?> register(Map<String, dynamic> data) async {
     try {
+      // Normalize payload to avoid trailing/leading whitespace issues
+      final normalized = {
+        ...data,
+        if (data.containsKey('username')) 'username': (data['username'] ?? '').toString().trim(),
+        if (data.containsKey('email')) 'email': (data['email'] ?? '').toString().trim(),
+        if (data.containsKey('name')) 'name': (data['name'] ?? '').toString().trim(),
+      };
       final response = await http.post(
         Uri.parse('$baseUrl/signup'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(data),
+        body: jsonEncode(normalized),
       );
 
       if (response.statusCode == 200) {
@@ -198,11 +205,12 @@ class ApiService {
   // --------------------------
   static Future<String?> login(String username, String password) async {
     try {
+    final normalizedUsername = username.trim();
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {
-          'username': username,
+      'username': normalizedUsername,
           'password': password,
         },
       );
@@ -427,7 +435,7 @@ class ApiService {
 
 
   static Future<dynamic> requestReset(String emailOrPhone) async {
-    final url = Uri.parse('https://tooth-care-app.onrender.com/auth/request-reset');
+  final url = Uri.parse('https://paras-backend-0gwt.onrender.com/auth/request-reset');
     final Map<String, dynamic> body = {};
     if (emailOrPhone.contains('@')) {
       body['email'] = emailOrPhone;

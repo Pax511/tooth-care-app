@@ -15,6 +15,7 @@ class CategoryScreen extends StatefulWidget {
 }
 
 class _CategoryScreenState extends State<CategoryScreen> {
+  // If this screen has instruction checklists, add log saving logic as in other instruction screens.
   final List<String> departments = [
     "Conservative Dentistry & Endodontics",
     "Oral & Maxillofacial Surgery",
@@ -140,7 +141,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
   // Calls your backend to store department and doctor!
   Future<void> saveDepartmentDoctor(
       String username, String department, String doctor) async {
-    final url = Uri.parse('https://tooth-care-app.onrender.com/department-doctor');
+  final url = Uri.parse('https://paras-backend-0gwt.onrender.com/department-doctor');
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('token');
 

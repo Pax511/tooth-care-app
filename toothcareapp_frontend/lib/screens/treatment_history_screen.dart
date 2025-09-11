@@ -9,6 +9,7 @@ class TreatmentHistoryScreen extends StatefulWidget {
 }
 
 class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
+  // If this screen has instruction checklists, add log saving logic as in other instruction screens.
   late Future<List<dynamic>?> _historyFuture;
 
   @override

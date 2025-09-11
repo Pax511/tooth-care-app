@@ -605,25 +605,25 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
                 procedureTime: TimeOfDay.fromDateTime(selectedDateTime),
               );
 
-              Widget navScreen;
+        Widget navScreen;
               switch (subtype) {
                 case "Filling":
-                  navScreen = const FillingInstructionsScreen();
+          navScreen = FillingInstructionsScreen(date: DateTime.now());
                   break;
                 case "Teeth Cleaning":
-                  navScreen = const TCInstructionsScreen();
+          navScreen = TCInstructionsScreen(date: DateTime.now());
                   break;
                 case "Teeth Whitening":
-                  navScreen = const TWInstructionsScreen();
+          navScreen = TWInstructionsScreen(date: DateTime.now());
                   break;
                 case "Gum Surgery":
-                  navScreen = const GSInstructionsScreen();
+          navScreen = GSInstructionsScreen(date: DateTime.now());
                   break;
                 case "Veneers/Laminates":
-                  navScreen = const VLInstructionsScreen();
+          navScreen = VLInstructionsScreen(date: DateTime.now());
                   break;
                 default:
-                  navScreen = const FillingInstructionsScreen();
+          navScreen = FillingInstructionsScreen(date: DateTime.now());
               }
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => navScreen),
@@ -655,17 +655,17 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
               final type = parts[0];
               final dateTime = DateTime.tryParse(parts[1]);
               if (dateTime != null) {
-                if (type == "Fixed Dentures") {
+        if (type == "Fixed Dentures") {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
-                        builder: (_) =>
-                            PFDInstructionsScreen(date: dateTime)),
+            builder: (_) =>
+              PFDInstructionsScreen(date: DateTime.now())),
                   );
                 } else if (type == "Removable Dentures") {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
-                        builder: (_) =>
-                            PRDInstructionsScreen(date: dateTime)),
+            builder: (_) =>
+              PRDInstructionsScreen(date: DateTime.now())),
                   );
                 }
               }
@@ -741,18 +741,18 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
                 procedureTime: TimeOfDay.fromDateTime(selectedDateTime),
               );
 
-              if (_selectedImplantStage == "First Stage") {
+        if (_selectedImplantStage == "First Stage") {
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(
-                      builder: (_) =>
-                          IFSInstructionsScreen(date: selectedDateTime)),
+            builder: (_) =>
+              IFSInstructionsScreen(date: DateTime.now())),
                       (route) => false,
                 );
               } else if (_selectedImplantStage == "Second Stage") {
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(
-                      builder: (_) =>
-                          ISSInstructionsScreen(date: selectedDateTime)),
+            builder: (_) =>
+              ISSInstructionsScreen(date: DateTime.now())),
                       (route) => false,
                 );
               }
@@ -968,10 +968,10 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
                             procedureDate: procedureDateTime,
                             procedureTime: procedureTime,
                           );
-                          Navigator.of(context).pushAndRemoveUntil(
+        Navigator.of(context).pushAndRemoveUntil(
                             MaterialPageRoute(
                               builder: (_) =>
-                                  TTOInstructionsScreen(date: procedureDateTime),
+          TTOInstructionsScreen(date: DateTime.now()),
                             ),
                                 (route) => false,
                           );
@@ -1010,11 +1010,11 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
                                 procedureDate: selectedDateTime,
                                 procedureTime: procedureTime,
                               );
-                              Navigator.of(context).pushAndRemoveUntil(
+                Navigator.of(context).pushAndRemoveUntil(
                                 MaterialPageRoute(
                                   builder: (_) =>
-                                      RootCanalInstructionsScreen(
-                                          date: selectedDateTime),
+                    RootCanalInstructionsScreen(
+                      date: DateTime.now()),
                                 ),
                                     (route) => false,
                               );
@@ -1051,10 +1051,10 @@ class _TreatmentScreenMainState extends State<TreatmentScreenMain> {
                                     procedureDate: procedureDate!,
                                     procedureTime: procedureTime!,
                                   );
-                                  Navigator.of(context).pushAndRemoveUntil(
+                  Navigator.of(context).pushAndRemoveUntil(
                                     MaterialPageRoute(
-                                      builder: (_) =>
-                                      const BracesInstructionsScreen(),
+                    builder: (_) =>
+                    BracesInstructionsScreen(date: DateTime.now()),
                                     ),
                                         (route) => false,
                                   );

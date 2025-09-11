@@ -1,3 +1,4 @@
+  // If this screen has instruction checklists, add log saving logic as in other instruction screens.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';

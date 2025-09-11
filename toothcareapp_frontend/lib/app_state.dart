@@ -42,6 +42,121 @@ class AppState extends ChangeNotifier {
   final Map<String, List<bool>> _dailyChecklist = {};
   final Map<String, List<bool>> _persistedChecklists = {};
 
+  // --- Checklist persistence helpers ---
+  String _checklistStorageKey(String key, {String? username}) {
+    final user = (username ?? this.username ?? 'default').trim();
+    return 'checklist_${user}_$key';
+  }
+
+  String _checklistRegistryKey({String? username}) {
+    final user = (username ?? this.username ?? 'default').trim();
+    return 'checklist_keys_$user';
+  }
+
+  Future<void> loadAllChecklists({String? username}) async {
+    final prefs = await SharedPreferences.getInstance();
+    // Migrate any 'default' user checklists to this user (first login scenario)
+    final user = (username ?? this.username)?.trim();
+    if (user != null && user.isNotEmpty && user != 'default') {
+      await _migrateDefaultChecklistsToUser(user);
+    }
+    final registryKey = _checklistRegistryKey(username: username);
+    final registryJson = prefs.getString(registryKey);
+    if (registryJson == null || registryJson.isEmpty) {
+      return;
+    }
+    try {
+      final List<dynamic> keys = jsonDecode(registryJson);
+      for (final k in keys) {
+        if (k is! String) continue;
+        final stored = prefs.getString(_checklistStorageKey(k, username: username));
+        if (stored == null) continue;
+        final List<dynamic> decoded = jsonDecode(stored);
+        final list = decoded.map((e) => e == true).toList();
+        _persistedChecklists[k] = List<bool>.from(list);
+      }
+      notifyListeners();
+    } catch (_) {
+      // Ignore corrupt entries
+    }
+  }
+
+  // Migrate persisted checklists from 'default' user to a real username once.
+  Future<void> _migrateDefaultChecklistsToUser(String username) async {
+    if (username.trim().isEmpty || username == 'default') return;
+    final prefs = await SharedPreferences.getInstance();
+    final defaultRegistryKey = _checklistRegistryKey(username: 'default');
+    final registryJson = prefs.getString(defaultRegistryKey);
+    if (registryJson == null || registryJson.isEmpty) return;
+    List<String> defaultKeys = [];
+    try {
+      defaultKeys = List<String>.from(jsonDecode(registryJson));
+    } catch (_) {
+      defaultKeys = [];
+    }
+    if (defaultKeys.isEmpty) {
+      await prefs.remove(defaultRegistryKey);
+      return;
+    }
+    // Load target registry for the real user
+    final targetRegistryKey = _checklistRegistryKey(username: username);
+    List<String> targetKeys = [];
+    final targetRegJson = prefs.getString(targetRegistryKey);
+    if (targetRegJson != null && targetRegJson.isNotEmpty) {
+      try { targetKeys = List<String>.from(jsonDecode(targetRegJson)); } catch (_) { targetKeys = []; }
+    }
+
+    bool changedTargetReg = false;
+    for (final k in defaultKeys) {
+      final srcKey = _checklistStorageKey(k, username: 'default');
+      final dstKey = _checklistStorageKey(k, username: username);
+      final src = prefs.getString(srcKey);
+      if (src == null) {
+        await prefs.remove(srcKey);
+        continue;
+      }
+      final dst = prefs.getString(dstKey);
+      if (dst == null) {
+        await prefs.setString(dstKey, src);
+        if (!targetKeys.contains(k)) {
+          targetKeys.add(k);
+          changedTargetReg = true;
+        }
+      }
+      // Remove default entry after migrating
+      await prefs.remove(srcKey);
+    }
+    if (changedTargetReg) {
+      await prefs.setString(targetRegistryKey, jsonEncode(targetKeys));
+    }
+    // Finally, remove the default registry
+    await prefs.remove(defaultRegistryKey);
+  }
+
+  Future<void> _saveChecklistForKey(String key, List<bool> list, {String? username}) async {
+    final prefs = await SharedPreferences.getInstance();
+    // Save value
+    await prefs.setString(
+      _checklistStorageKey(key, username: username),
+      jsonEncode(list),
+    );
+    // Update registry
+    final registryKey = _checklistRegistryKey(username: username);
+    final registryJson = prefs.getString(registryKey);
+    List<String> keys = [];
+    if (registryJson != null && registryJson.isNotEmpty) {
+      try {
+        keys = List<String>.from(jsonDecode(registryJson));
+      } catch (_) {
+        keys = [];
+      }
+    }
+    if (!keys.contains(key)) {
+      keys.add(key);
+      await prefs.setString(registryKey, jsonEncode(keys));
+    }
+  }
+
   // Instruction logs (for ProgressScreen)
   final List<Map<String, dynamic>> _instructionLogs = [];
 
@@ -58,9 +173,10 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final key = username != null ? 'instruction_logs_${username}' : 'instruction_logs';
     final data = prefs.getString(key);
+    final legacy = prefs.getString('instruction_logs'); // migrate if present
+    _instructionLogs.clear();
     if (data != null) {
       final List<dynamic> decoded = jsonDecode(data);
-      _instructionLogs.clear();
       for (var item in decoded) {
         _instructionLogs.add({
           'date': item['date'] ?? '',
@@ -73,8 +189,40 @@ class AppState extends ChangeNotifier {
           'subtype': item['subtype'] ?? '',
         });
       }
-      notifyListeners();
     }
+    // Merge legacy logs (without username scoping) once
+    if (legacy != null) {
+      try {
+        final List<dynamic> decoded = jsonDecode(legacy);
+        for (var item in decoded) {
+          final m = {
+            'date': item['date'] ?? '',
+            'note': item['note'] ?? '',
+            'type': item['type'] ?? '',
+            'followed': item['followed'] ?? false,
+            'instruction': item['instruction'] ?? item['note'] ?? '',
+            'username': item['username'] ?? username ?? '',
+            'treatment': item['treatment'] ?? '',
+            'subtype': item['subtype'] ?? '',
+          };
+          // Avoid duplicates
+          final exists = _instructionLogs.any((e) =>
+            e['date'] == m['date'] &&
+            e['instruction'] == m['instruction'] &&
+            e['type'] == m['type'] &&
+            e['username'] == m['username']
+          );
+          if (!exists) _instructionLogs.add(m);
+        }
+        // After migration, save to user-scoped key and clear legacy
+        await _saveInstructionLogs(username: username ?? this.username);
+        await prefs.remove('instruction_logs');
+      } catch (_) {
+        // ignore migration errors
+      }
+    }
+    debugPrint('Loaded instruction logs for $username: count = \\${_instructionLogs.length}');
+    notifyListeners();
   }
 
   Future<void> addInstructionLog(
@@ -94,13 +242,15 @@ class AppState extends ChangeNotifier {
     final sub = subtype ?? _treatmentSubtype ?? '';
     final instruction = note;
 
+    // Only remove exact duplicate for same date, instruction, and type
     _instructionLogs.removeWhere((log) =>
-    log['date'] == formattedDate &&
-        log['type'] == type &&
-        log['instruction'] == instruction &&
-        log['username'] == user &&
-        log['treatment'] == treat &&
-        log['subtype'] == sub);
+      log['date'] == formattedDate &&
+      log['instruction'] == instruction &&
+      log['type'] == type &&
+      log['username'] == user &&
+      log['treatment'] == treat &&
+      log['subtype'] == sub
+    );
 
     _instructionLogs.add({
       'date': formattedDate,
@@ -112,6 +262,7 @@ class AppState extends ChangeNotifier {
       'treatment': treat,
       'subtype': sub,
     });
+    debugPrint('Added instruction log for $user on $formattedDate. Total logs: \\${_instructionLogs.length}');
     await _saveInstructionLogs(username: user);
     notifyListeners();
   }
@@ -260,6 +411,8 @@ class AppState extends ChangeNotifier {
 
   void setChecklistForKey(String key, List<bool> list) {
     _persistedChecklists[key] = List<bool>.from(list);
+    // Persist asynchronously (no await to keep API sync-friendly)
+    _saveChecklistForKey(key, list, username: username);
     notifyListeners();
   }
 
@@ -270,7 +423,9 @@ class AppState extends ChangeNotifier {
 
   void setChecklistForTreatmentDay(String treatmentKey, int day, List<bool> values) {
     String key = "${treatmentKey}_day$day";
-    _persistedChecklists[key] = List<bool>.from(values);
+  _persistedChecklists[key] = List<bool>.from(values);
+  // Persist as well
+  _saveChecklistForKey(key, _persistedChecklists[key]!, username: username);
     notifyListeners();
   }
 
