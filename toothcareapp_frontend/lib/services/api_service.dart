@@ -6,6 +6,70 @@ import 'package:flutter/material.dart';
 
 class ApiService {
 
+  // ---------------------------
+  // ✅ Mark Current Treatment as Complete
+  // ---------------------------
+  static Future<bool> markEpisodeComplete() async {
+    try {
+      final headers = await getAuthHeaders();
+      final url = Uri.parse('$baseUrl/episodes/mark-complete');
+      final body = jsonEncode({"procedure_completed": true});
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: body,
+      );
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print('Mark episode complete failed: \\${response.statusCode} → \\${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Mark episode complete error: \\${e}');
+      return false;
+    }
+  }
+
+  // --------------------------
+  // ✅ Register device token (FCM)
+  // --------------------------
+  static Future<bool> registerDeviceToken({required String platform, required String token}) async {
+    try {
+      final headers = await getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$baseUrl/push/register-device'),
+        headers: headers,
+        body: jsonEncode({
+          'platform': platform,
+          'token': token,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('registerDeviceToken error: $e');
+      return false;
+    }
+  }
+
+  // --------------------------
+  // ✅ Send test push (optional)
+  // --------------------------
+  static Future<bool> sendTestPush({required String title, required String body}) async {
+    try {
+      final headers = await getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$baseUrl/push/test'),
+        headers: headers,
+        body: jsonEncode({'title': title, 'body': body}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('sendTestPush error: $e');
+      return false;
+    }
+  }
+
   // --------------------------
   // ✅ Request Signup OTP
   // --------------------------
@@ -237,17 +301,6 @@ class ApiService {
     }
   }
 
-  // Helper: Map backend signup errors to user-friendly messages
-  static String _mapSignupError(String? detail) {
-    if (detail == null) return "Signup failed. Please try again.";
-    if (detail.contains("Username already exists"))
-      return "This username is already taken. Please choose another.";
-    if (detail.contains("email already exists"))
-      return "This email is already registered. Try logging in or use another email.";
-    if (detail.toLowerCase().contains("weak password"))
-      return "Password is too weak. Please choose a stronger password.";
-    return detail;
-  }
 
   // Helper: Map backend login errors to user-friendly messages
   static String _mapLoginError(String? detail) {
@@ -316,6 +369,26 @@ class ApiService {
       }
     } catch (e) {
       print('Progress submission error: $e');
+      return false;
+    }
+  }
+
+  // --------------------------
+  // ✅ Rotate Episode If Due (15+ days)
+  // --------------------------
+  static Future<bool> rotateIfDue() async {
+    try {
+      final headers = await getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$baseUrl/episodes/rotate-if-due'),
+        headers: headers,
+      );
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        return body['rotated'] == true;
+      }
+      return false;
+    } catch (_) {
       return false;
     }
   }
@@ -469,7 +542,3 @@ class ApiService {
   }
 
 }
-
-
-
-// Add this inside your ApiService class

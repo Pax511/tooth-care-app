@@ -23,7 +23,9 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
     final subtype = (t['treatment_subtype'] ?? t['subtype'] ?? '').toString().trim();
     final dateStr = (t['procedure_date'] ?? '').toString().trim();
     final time = (t['procedure_time'] ?? '').toString().trim();
-    final completed = t['procedure_completed'] == true;
+    // Handle possible variations: true/false, 'true'/'false', 1/0
+    final rawLocked = t['locked'];
+    final isLocked = rawLocked == true || rawLocked == 1 || (rawLocked is String && rawLocked.toString().toLowerCase() == 'true');
 
     // Defensive fallback UI
     final displayTreatment = treatment.isNotEmpty ? treatment : "No Treatment";
@@ -31,22 +33,9 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
     final displayDate = dateStr.isNotEmpty ? dateStr : "-";
     final displayTime = time.isNotEmpty ? time : "-";
 
-    // Parse procedure_date
-    DateTime? procedureDate;
-    if (dateStr.isNotEmpty) {
-      procedureDate = DateTime.tryParse(dateStr);
-    }
-
-    // Calculate if healing period is over (14 days)
-    bool isHealingOver = false;
-    if (procedureDate != null) {
-      final healingEnd = procedureDate.add(const Duration(days: 14));
-      if (DateTime.now().isAfter(healingEnd)) {
-        isHealingOver = true;
-      }
-    }
-
-    final actuallyCompleted = completed || isHealingOver;
+    // Backend contract: locked=true indicates a past (completed) episode.
+    // Use locked for card labeling to stay consistent with grouping below.
+    final actuallyCompleted = isLocked;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -63,7 +52,7 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
         subtitle: Text("Date: $displayDate\nTime: $displayTime"),
         trailing: actuallyCompleted
             ? const Text("Completed", style: TextStyle(color: Colors.green))
-            : const Text("Ongoing", style: TextStyle(color: Colors.orange)),
+            : const Text("Current", style: TextStyle(color: Colors.orange)),
         onTap: () {
           // Optionally: navigate to treatment instructions or details
         },
@@ -78,6 +67,31 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
         title: const Text("Treatment History"),
         backgroundColor: Colors.blue,
         elevation: 2,
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              setState(() {
+                _historyFuture = ApiService.getEpisodeHistory();
+              });
+            },
+          ),
+          IconButton(
+            tooltip: 'Rotate If Due',
+            icon: const Icon(Icons.autorenew),
+            onPressed: () async {
+              final rotated = await ApiService.rotateIfDue();
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(rotated ? 'Rotated: new episode opened' : 'No rotation: not yet due')), 
+              );
+              setState(() {
+                _historyFuture = ApiService.getEpisodeHistory();
+              });
+            },
+          ),
+        ],
       ),
       body: FutureBuilder<List<dynamic>?>(
         future: _historyFuture,
@@ -118,13 +132,24 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
               ],
             );
           }
-          // Separate ongoing and completed treatments for sectioned display
-          final ongoingTreatments = treatments.where((t) =>
-          (t['procedure_completed'] == false || t['procedure_completed'] == null)
-          ).toList();
-          final completedTreatments = treatments.where((t) =>
-          t['procedure_completed'] == true
-          ).toList();
+          // Separate current vs completed using backend's locked flag.
+          bool isLocked(dynamic t) {
+            final m = t as Map;
+            final lc = m['locked'];
+            return lc == true || lc == 1 || (lc is String && lc.toString().toLowerCase() == 'true');
+          }
+          final completedTreatments = treatments.where((t) => isLocked(t)).toList();
+          final ongoingTreatments = treatments.where((t) => !isLocked(t)).toList();
+
+          // Sort both groups by date descending (most recent first)
+          int parseDate(dynamic t) {
+            final m = t as Map;
+            final ds = (m['procedure_date'] ?? '').toString();
+            final dt = DateTime.tryParse(ds);
+            return dt?.millisecondsSinceEpoch ?? 0;
+          }
+          ongoingTreatments.sort((a, b) => parseDate(b).compareTo(parseDate(a)));
+          completedTreatments.sort((a, b) => parseDate(b).compareTo(parseDate(a)));
 
           return ListView(
             children: [
@@ -161,7 +186,15 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
+        onPressed: () async {
+          // Mark current treatment as complete before starting new one
+          final success = await ApiService.markEpisodeComplete();
+          if (!success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to mark previous treatment as complete.')),
+            );
+            return;
+          }
           Navigator.of(context).pop();
         },
         icon: const Icon(Icons.add),

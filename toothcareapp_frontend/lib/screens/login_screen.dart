@@ -29,7 +29,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _persistLoginToken(String username, String token) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_token', token);
+    // Store under the same key ApiService uses
+    await prefs.setString('token', token);
     await prefs.setString('username', username);
   }
 
@@ -45,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final appState = Provider.of<AppState>(context, listen: false);
     final result = await ApiService.login(_username, _password);
 
-    if (result != null && result is String) {
+    if (result != null) {
       setState(() {
         _error = result;
         _loading = false;
@@ -62,7 +63,9 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    // Persist and sync token immediately so the rest of the app sees it
     await _persistLoginToken(_username, token);
+    await appState.setToken(token);
 
     final userDetails = await ApiService.getUserDetails();
     if (userDetails != null) {
@@ -71,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
           fullName: userDetails['name'] ?? '',
           dob: DateTime.tryParse(userDetails['dob'] ?? '') ?? DateTime.now(),
           gender: userDetails['gender'] ?? '',
-          username: userDetails['username'] ?? '',
+          username: (userDetails['username'] ?? _username).toString(),
           password: _password,
           phone: userDetails['phone'] ?? '',
           email: userDetails['email'] ?? '',
@@ -293,8 +296,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         ElevatedButton(
-                          onPressed: _handleLogin,
-                          child: const Text("Login"),
+                          onPressed: _loading ? null : _handleLogin,
+                          child: _loading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text("Login"),
                         ),
                         const SizedBox(width: 16),
                         TextButton(

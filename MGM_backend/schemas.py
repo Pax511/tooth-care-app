@@ -198,3 +198,18 @@ class MarkCompleteRequest(BaseModel):
 class RotateIfDueResponse(BaseModel):
     rotated: bool
     new_episode_id: Optional[int] = None
+
+# ---- Push Notifications ----
+class DeviceRegisterRequest(BaseModel):
+    platform: str  # 'android' | 'ios'
+    token: str     # FCM device token
+
+class DeviceTokenResponse(BaseModel):
+    id: int
+    platform: str
+    token: str
+    model_config = ConfigDict(from_attributes=True)
+
+class PushTestRequest(BaseModel):
+    title: str
+    body: str

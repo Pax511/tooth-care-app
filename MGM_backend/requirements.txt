@@ -11,3 +11,4 @@ bcrypt
 passlib>=1.7.4
 bcrypt>=3.2.0,<4.1.0
 requests>=2.25.1
+google-auth>=2.35.0

@@ -17,7 +17,7 @@ from sqlalchemy import select
 import schemas
 from database import engine
 
-from utils import send_registration_email
+from utils import send_registration_email, send_fcm_notification
 from routes import auth
 
 app = FastAPI()
@@ -377,3 +377,41 @@ async def rotate_if_due_endpoint(db: AsyncSession = Depends(get_db), current_use
     if new_id is None:
         return schemas.RotateIfDueResponse(rotated=False, new_episode_id=None)
     return schemas.RotateIfDueResponse(rotated=True, new_episode_id=new_id)
+
+# ---------------------------
+# Push notifications endpoints
+# ---------------------------
+@app.post("/push/register-device", response_model=schemas.DeviceTokenResponse)
+async def register_device(payload: schemas.DeviceRegisterRequest, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+    # Upsert by unique token; if token exists, reassign to current user and update platform
+    existing_q = await db.execute(select(models.DeviceToken).where(models.DeviceToken.token == payload.token))
+    existing = existing_q.scalars().first()
+    if existing:
+        object.__setattr__(existing, 'patient_id', current_user.id)
+        object.__setattr__(existing, 'platform', payload.platform)
+        db.add(existing)
+        await db.commit()
+        await db.refresh(existing)
+        return existing
+    row = models.DeviceToken(patient_id=current_user.id, platform=payload.platform, token=payload.token)
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+@app.get("/push/devices", response_model=List[schemas.DeviceTokenResponse])
+async def list_my_devices(db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+    res = await db.execute(select(models.DeviceToken).where(models.DeviceToken.patient_id == current_user.id))
+    return res.scalars().all()
+
+@app.post("/push/test")
+async def push_test(payload: schemas.PushTestRequest, db: AsyncSession = Depends(get_db), current_user: models.Patient = Depends(get_current_user)):
+    res = await db.execute(select(models.DeviceToken.token).where(models.DeviceToken.patient_id == current_user.id))
+    tokens = [row[0] for row in res.all()]
+    if not tokens:
+        raise HTTPException(status_code=400, detail="No registered device tokens")
+    sent = 0
+    for t in tokens:
+        if send_fcm_notification(t, payload.title, payload.body):
+            sent += 1
+    return {"sent": sent, "total": len(tokens)}

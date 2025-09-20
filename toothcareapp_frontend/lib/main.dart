@@ -3,19 +3,49 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_state.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
+import 'services/reminder_store.dart';
+import 'services/push_service.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/category_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/treatment_screen.dart';
 import 'screens/pfd_instructions_screen.dart';
 import 'screens/prd_instructions_screen.dart';
-import 'auth_callbacks.dart';
+// ignore_for_file: avoid_print
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 
 // Add RouteObserver for navigation events (must be after all imports)
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize AlarmManager so alarms can fire when app is killed
+  try {
+    await AndroidAlarmManager.initialize();
+    print('AndroidAlarmManager initialized');
+  } catch (e) {
+    print('AndroidAlarmManager init error: $e');
+  }
+  await NotificationService.init();
+
+  // Ensure daily reminders are scheduled on startup
+  try {
+    final reminders = await ReminderStore.load();
+    for (final r in reminders) {
+      if (r.enabled) {
+        await NotificationService.scheduleDailyNotification(
+          id: r.id,
+          hour: r.hour,
+          minute: r.minute,
+          title: 'Reminder',
+          body: r.title,
+        );
+      } else {
+        await NotificationService.cancel(r.id);
+      }
+    }
+  } catch (_) {}
 
   final appState = AppState();
   await appState.syncTokenFromPrefs();       // <-- Ensure token is loaded!
@@ -34,6 +64,11 @@ void main() async {
       child: const ToothCareGuideApp(),
     ),
   );
+
+  // Initialize push after app launch so SharedPreferences token is ready
+  if (appState.token != null) {
+    await PushService.initializeAndRegister();
+  }
 }
 
 // Utility function to parse "HH:mm:ss" or "HH:mm" string to TimeOfDay
@@ -298,6 +333,11 @@ class _AppEntryGateState extends State<AppEntryGate> {
           if (token != null) {
             appState.setToken(token);
           }
+
+          // Register push token as soon as logged in
+          if (appState.token != null) {
+            await PushService.initializeAndRegister();
+          }
           appState.setUserDetails(
             fullName: name,
             dob: DateTime.parse(dob),
@@ -329,6 +369,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
               content: Text(error),
             ),
           );
+          return error; // satisfy Future<String?>
         } else {
           final appState = Provider.of<AppState>(context, listen: false);
           // --- Ensure token is stored after login ---
@@ -407,6 +448,7 @@ class _AppEntryGateState extends State<AppEntryGate> {
               );
             }
           });
+          return null; // Ensure Future<String?> completes
         }
       },
     );

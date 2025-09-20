@@ -33,6 +33,7 @@ class Patient(Base):
     progress_entries = relationship("Progress", back_populates="patient", cascade="all, delete-orphan")
     instruction_statuses = relationship("InstructionStatus", back_populates="patient", cascade="all, delete-orphan")
     episodes = relationship("TreatmentEpisode", back_populates="patient", cascade="all, delete-orphan")
+    device_tokens = relationship("DeviceToken", back_populates="patient", cascade="all, delete-orphan")
 
     def set_password(self, raw_password):
         self.password = pwd_context.hash(raw_password)
@@ -76,6 +77,16 @@ class Doctor(Base):
         if not isinstance(self.password, str):
             raise ValueError("Password attribute is not loaded or not a string.")
         return pwd_context.verify(raw_password, self.password)
+
+class DeviceToken(Base):
+    __tablename__ = "device_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False, index=True)
+    platform = Column(String, nullable=False)  # e.g., 'android', 'ios'
+    token = Column(String, unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    patient = relationship("Patient", back_populates="device_tokens")
 
 class Appointment(Base):
     __tablename__ = "appointments"

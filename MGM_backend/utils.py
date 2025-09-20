@@ -1,4 +1,7 @@
 import requests
+import json
+from google.oauth2 import service_account
+from google.auth.transport.requests import Request as GAuthRequest
 
 def send_mailgun_email(to_email, subject, body):
     import os
@@ -163,3 +166,77 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+# ------------------------
+# FCM Push Notifications
+# ------------------------
+def _get_v1_access_token(sa_info: dict) -> str:
+    credentials = service_account.Credentials.from_service_account_info(
+        sa_info,
+        scopes=["https://www.googleapis.com/auth/firebase.messaging"],
+    )
+    credentials.refresh(GAuthRequest())
+    return credentials.token
+
+def _send_fcm_v1(token: str, title: str, body: str, data: dict | None, sa_info: dict, project_id: str) -> bool:
+    access_token = _get_v1_access_token(sa_info)
+    url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json; UTF-8",
+    }
+    payload = {
+        "message": {
+            "token": token,
+            "notification": {"title": title, "body": body},
+            "data": data or {},
+        }
+    }
+    resp = requests.post(url, data=json.dumps(payload), headers=headers, timeout=10)
+    if resp.status_code in (200, 202):
+        return True
+    print(f"FCM v1 send failed {resp.status_code}: {resp.text}")
+    return False
+
+def _send_fcm_legacy(token: str, title: str, body: str, data: dict | None, server_key: str) -> bool:
+    url = "https://fcm.googleapis.com/fcm/send"
+    headers = {
+        "Authorization": f"key={server_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "to": token,
+        "notification": {"title": title, "body": body},
+        "data": data or {},
+        "priority": "high",
+    }
+    resp = requests.post(url, json=payload, headers=headers, timeout=10)
+    if resp.status_code == 200:
+        return True
+    print(f"FCM legacy send failed {resp.status_code}: {resp.text}")
+    return False
+
+def send_fcm_notification(token: str, title: str, body: str, data: dict | None = None) -> bool:
+    sa_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+    project_id = os.getenv("FIREBASE_PROJECT_ID")
+    if sa_json and project_id:
+        try:
+            sa_info = json.loads(sa_json)
+            return _send_fcm_v1(token, title, body, data, sa_info, project_id)
+        except Exception as e:
+            print(f"FCM v1 error, falling back to legacy: {e}")
+    server_key = os.getenv("FCM_SERVER_KEY")
+    if not server_key:
+        print("FCM_SERVER_KEY not set and v1 not configured")
+        return False
+    return _send_fcm_legacy(token, title, body, data, server_key)
+
+def send_fcm_to_tokens(tokens: list[str], title: str, body: str, data: dict | None = None) -> dict:
+    results = {"success": 0, "failure": 0}
+    for t in tokens:
+        ok = send_fcm_notification(t, title, body, data)
+        if ok:
+            results["success"] += 1
+        else:
+            results["failure"] += 1
+    return results
